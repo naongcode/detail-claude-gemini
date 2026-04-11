@@ -7,7 +7,7 @@ import { generateSectionImage } from '@/lib/gemini'
 import { isProductSection } from '@/lib/image-utils'
 import { ProductBrief, ResearchOutput, PageDesign } from '@/lib/types'
 
-export const maxDuration = 300
+export const maxDuration = 800
 
 function sse(controller: ReadableStreamDefaultController, data: object) {
   controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(data)}\n\n`))
@@ -69,7 +69,7 @@ export async function GET(
             const photoBuffers = isProductSection(imgReq.id) ? allPhotoBuffers : []
             const buffer = await generateSectionImage(imgReq.prompt, imgReq.width, imgReq.height, photoBuffers)
             await uploadSection(id, imgReq.id, buffer)
-            await new Promise((r) => setTimeout(r, 3000))
+            await new Promise((r) => setTimeout(r, 500))
           }
 
           sse(controller, { type: 'step_done', step: imageStep, sectionId: imgReq.id })
