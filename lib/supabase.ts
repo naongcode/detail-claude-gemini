@@ -150,6 +150,14 @@ export async function uploadPhoto(
   return getPublicUrl(pid, 'photo', filename)
 }
 
+export async function createSignedUploadUrl(pid: string, filename: string): Promise<{ signedUrl: string; token: string; path: string }> {
+  const supabase = getClient()
+  const filePath = storagePath(pid, 'photo', filename)
+  const { data, error } = await supabase.storage.from(BUCKET).createSignedUploadUrl(filePath)
+  if (error || !data) throw error ?? new Error('signed URL 생성 실패')
+  return { signedUrl: data.signedUrl, token: data.token, path: data.path }
+}
+
 export async function listPhotos(pid: string): Promise<string[]> {
   const supabase = getClient()
   const { data, error } = await supabase.storage.from(BUCKET).list(`${pid}/photos`, { limit: 100 })

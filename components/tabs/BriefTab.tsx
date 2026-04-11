@@ -115,10 +115,31 @@ export default function BriefTab({ projectId, projectStatus, onStatusChange, onT
     if (!files || files.length === 0) return
     setPhotoSaving(true)
     try {
-      const formData = new FormData()
-      Array.from(files).forEach((file) => formData.append('photos', file))
-      const res = await fetch(`/api/projects/${projectId}/photos`, { method: 'POST', body: formData })
-      if (res.ok) { await fetchPhotos(); onStatusChange() }
+      const fileArray = Array.from(files)
+
+      // 1. 서버에서 signed URL 발급
+      const res = await fetch(`/api/projects/${projectId}/photos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filenames: fileArray.map((f) => f.name) }),
+      })
+      if (!res.ok) { alert('업로드 URL 발급 실패'); return }
+      const { urls } = await res.json() as { urls: Array<{ filename: string; signedUrl: string }> }
+
+      // 2. 각 파일을 Supabase Storage에 직접 업로드
+      await Promise.all(
+        urls.map(({ filename, signedUrl }) => {
+          const file = fileArray.find((f) => f.name.replace(/[^a-zA-Z0-9가-힣._-]/g, '_') === filename) ?? fileArray[0]
+          return fetch(signedUrl, {
+            method: 'PUT',
+            headers: { 'Content-Type': file.type || 'image/jpeg' },
+            body: file,
+          })
+        })
+      )
+
+      await fetchPhotos()
+      onStatusChange()
     } finally { setPhotoSaving(false) }
   }
 
