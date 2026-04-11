@@ -239,7 +239,7 @@ export async function listSections(pid: string): Promise<string[]> {
 
 export async function uploadFinalPng(pid: string, buffer: Buffer): Promise<string> {
   const supabase = getClient()
-  const { error } = await supabase.storage.from(BUCKET).upload(`${pid}/final.png`, buffer, {
+  const { error } = await supabase.storage.from(BUCKET).upload(storagePath(pid, 'final'), buffer, {
     contentType: 'image/png',
     upsert: true,
   })
@@ -249,13 +249,14 @@ export async function uploadFinalPng(pid: string, buffer: Buffer): Promise<strin
 
 export async function downloadFinalPng(pid: string): Promise<Buffer | null> {
   const supabase = getClient()
-  const { data, error } = await supabase.storage.from(BUCKET).download(`${pid}/final.png`)
+  const { data, error } = await supabase.storage.from(BUCKET).download(storagePath(pid, 'final'))
   if (error || !data) return null
   return Buffer.from(await data.arrayBuffer())
 }
 
 export async function hasFinalPng(pid: string): Promise<boolean> {
   const supabase = getClient()
-  const { data } = await supabase.storage.from(BUCKET).list(pid, { search: 'final.png' })
+  const key = toStorageKey(pid)
+  const { data } = await supabase.storage.from(BUCKET).list(key, { search: 'final.png' })
   return (data ?? []).some((f) => f.name === 'final.png')
 }
