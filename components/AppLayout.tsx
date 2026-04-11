@@ -27,7 +27,6 @@ export default function AppLayout({ projectId }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>('brief')
   const [projects, setProjects] = useState<ProjectMeta[]>([])
   const [projectStatus, setProjectStatus] = useState<ProjectStatus | null>(null)
-  const [projectName, setProjectName] = useState('')
   const [statusTick, setStatusTick] = useState(0)
 
   const refreshProjects = useCallback(async () => {
@@ -43,7 +42,6 @@ export default function AppLayout({ projectId }: Props) {
     if (res.ok) {
       const data = await res.json()
       setProjectStatus(data.status)
-      setProjectName(data.name || projectId)
     }
   }, [projectId])
 
@@ -108,7 +106,7 @@ export default function AppLayout({ projectId }: Props) {
               ← 목록
             </button>
             <span className="text-slate-300">/</span>
-            <span className="font-semibold text-slate-800 truncate">{projectName}</span>
+            <span className="font-semibold text-slate-800 truncate">{projects.find(p => p.id === projectId)?.name ?? projectId}</span>
           </div>
           {projectStatus?.hasPageDesign && (
             <span className="shrink-0 text-xs px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 font-medium">
@@ -151,7 +149,7 @@ export default function AppLayout({ projectId }: Props) {
             <TextEditTab projectId={projectId} onStatusChange={triggerStatusRefresh} />
           )}
           {activeTab === 'result' && (
-            <ResultTab projectId={projectId} projectName={projectName} projectStatus={projectStatus} onStatusChange={triggerStatusRefresh} />
+            <ResultTab projectId={projectId} projectName={projects.find(p => p.id === projectId)?.name ?? projectId} projectStatus={projectStatus} onStatusChange={triggerStatusRefresh} />
           )}
         </div>
       </div>
