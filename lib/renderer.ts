@@ -34,8 +34,8 @@ export async function renderToPng(
 
   try {
     if (IS_VERCEL) {
-      const chromium = (await import(/* webpackIgnore: true */ '@sparticuz/chromium')).default
-      const puppeteer = (await import(/* webpackIgnore: true */ 'puppeteer-core')).default
+      const chromium = (await import('@sparticuz/chromium')).default
+      const puppeteer = (await import('puppeteer-core')).default
 
       const browser = await puppeteer.launch({
         args: chromium.args,
