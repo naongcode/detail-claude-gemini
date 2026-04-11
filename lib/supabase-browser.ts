@@ -8,12 +8,12 @@ export const supabaseBrowser = createClient(
 
 export const BUCKET = 'project-assets'
 
+// Supabase Storage는 ASCII만 허용 — 프로젝트 ID를 URL-safe base64로 인코딩
 function toStorageKey(pid: string): string {
-  return pid
-    .replace(/[^\x00-\x7F]/g, '')
-    .replace(/[^a-zA-Z0-9_\-]/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_|_$/g, '')
+  return btoa(unescape(encodeURIComponent(pid)))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '')
 }
 
 export async function uploadPhotoFromBrowser(

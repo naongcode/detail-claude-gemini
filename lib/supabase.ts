@@ -14,13 +14,9 @@ function getClient() {
 
 export const BUCKET = 'project-assets'
 
-// Supabase Storage는 ASCII만 허용 — 한글 등 비ASCII 문자 제거
+// Supabase Storage는 ASCII만 허용 — 프로젝트 ID를 URL-safe base64로 인코딩
 function toStorageKey(pid: string): string {
-  return pid
-    .replace(/[^\x00-\x7F]/g, '')   // 비ASCII 제거
-    .replace(/[^a-zA-Z0-9_\-]/g, '_') // 허용 문자 외 치환
-    .replace(/_+/g, '_')              // 연속 언더스코어 정리
-    .replace(/^_|_$/g, '')            // 앞뒤 언더스코어 제거
+  return Buffer.from(pid).toString('base64url')
 }
 
 export function storagePath(pid: string, type: 'photo' | 'section' | 'final', filename?: string): string {
