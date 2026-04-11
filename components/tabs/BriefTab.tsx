@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { ProductBrief, ProjectStatus, PipelineEvent } from '@/lib/types'
+import { ProductBrief, ProjectStatus, PipelineEvent, ImageRequest } from '@/lib/types'
 import ProgressLog, { LogEntry } from '@/components/ui/ProgressLog'
 
 interface Props {
@@ -136,33 +136,90 @@ export default function BriefTab({ projectId, projectStatus, onStatusChange, onT
     setLogs([])
     setPipelineRunning(true)
     let finished = false
+
     const es = new EventSource(`/api/projects/${projectId}/generate/pipeline`)
     eventSourceRef.current = es
+
     es.onmessage = (event) => {
       try {
         const data: PipelineEvent = JSON.parse(event.data)
         if (data.type === 'step_done') return
+
         const type: LogEntry['type'] =
-          data.type === 'error' ? 'error' :
-          data.type === 'done'  ? 'success' :
-          data.type === 'step'  ? 'step' : 'info'
+          data.type === 'error'        ? 'error' :
+          data.type === 'done'         ? 'success' :
+          data.type === 'design_ready' ? 'success' :
+          data.type === 'step'         ? 'step' : 'info'
         const message =
-          data.type === 'error' ? `오류: ${data.message}` :
-          data.type === 'done'  ? `✓ ${data.message}` :
+          data.type === 'error'        ? `오류: ${data.message}` :
+          data.type === 'done'         ? `✓ ${data.message}` :
+          data.type === 'design_ready' ? `✓ ${data.message}` :
           `[${data.step}] ${data.message}`
         setLogs((prev) => [...prev, { message, type, timestamp: new Date() }])
-        if (data.type === 'done' || data.type === 'error') {
+
+        if (data.type === 'design_ready' && data.images) {
+          finished = true
+          es.close()
+          // 설계 완료 → 이미지 개별 생성 시작
+          runImageGeneration(data.images)
+        }
+        if (data.type === 'error') {
           finished = true
           es.close(); setPipelineRunning(false); onStatusChange()
-          if (data.type === 'done') onTabChange('result')
         }
       } catch { /* ignore */ }
     }
     es.onerror = () => {
       if (!finished) {
         setLogs((prev) => [...prev, { message: 'SSE 연결 오류', type: 'error', timestamp: new Date() }])
+        setPipelineRunning(false)
       }
-      es.close(); setPipelineRunning(false)
+      es.close()
+    }
+  }
+
+  const runImageGeneration = async (images: ImageRequest[]) => {
+    const total = images.length
+    for (let i = 0; i < images.length; i++) {
+      const { id: sectionId } = images[i]
+      setLogs((prev) => [...prev, {
+        message: `[${i + 4}] 이미지 생성 중: ${sectionId} (${i + 1}/${total})`,
+        type: 'step',
+        timestamp: new Date(),
+      }])
+      try {
+        const res = await fetch(`/api/projects/${projectId}/generate/image`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sectionId }),
+        })
+        if (!res.ok) {
+          const err = await res.json()
+          throw new Error(err.error ?? '이미지 생성 실패')
+        }
+        onStatusChange()
+      } catch (err) {
+        setLogs((prev) => [...prev, { message: `오류: ${String(err)}`, type: 'error', timestamp: new Date() }])
+        setPipelineRunning(false)
+        return
+      }
+    }
+
+    // 모든 이미지 완료 → 최종 렌더링
+    setLogs((prev) => [...prev, { message: `[${total + 4}] HTML 조립 및 PNG 렌더링 중...`, type: 'step', timestamp: new Date() }])
+    try {
+      const res = await fetch(`/api/projects/${projectId}/generate/render`, { method: 'POST' })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error ?? '렌더링 실패')
+      }
+      setLogs((prev) => [...prev, { message: '✓ 상세페이지 생성 완료!', type: 'success', timestamp: new Date() }])
+      onStatusChange()
+      onTabChange('result')
+    } catch (err) {
+      setLogs((prev) => [...prev, { message: `렌더링 오류: ${String(err)}`, type: 'error', timestamp: new Date() }])
+    } finally {
+      setPipelineRunning(false)
     }
   }
 

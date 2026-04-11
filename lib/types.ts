@@ -15,10 +15,11 @@ export type ProductCategory =
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface PipelineEvent {
-  type?: 'step' | 'step_done' | 'done' | 'error'
+  type?: 'step' | 'step_done' | 'done' | 'error' | 'design_ready'
   step?: number
   message?: string
   sectionId?: string
+  images?: ImageRequest[]
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
