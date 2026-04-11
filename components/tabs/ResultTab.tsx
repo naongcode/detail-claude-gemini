@@ -109,15 +109,19 @@ export default function ResultTab({ projectId, projectName, projectStatus, onSta
         </div>
         {projectStatus?.hasFinalPng && (
           <button
-            onClick={() => {
+            onClick={async () => {
               const now = new Date()
               const pad = (n: number) => String(n).padStart(2, '0')
               const ts = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`
               const safeName = projectName.replace(/[/\\?%*:|"<>]/g, '_')
+              const res = await fetch(`/api/projects/${projectId}/files/final_page.png`)
+              const blob = await res.blob()
+              const blobUrl = URL.createObjectURL(blob)
               const a = document.createElement('a')
-              a.href = `/api/projects/${projectId}/files/final_page.png`
+              a.href = blobUrl
               a.download = `${safeName}_${ts}.png`
               a.click()
+              URL.revokeObjectURL(blobUrl)
             }}
             className="flex items-center gap-2 bg-blue-600 text-white text-sm px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-colors font-semibold shadow-sm"
           >
