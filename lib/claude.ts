@@ -88,6 +88,8 @@ export async function generateDetailPage(
    - 다단 그리드(2열, 3열, 4열) **절대 금지** — 모든 콘텐츠는 단일 컬럼으로 배치
    - 여러 항목(후기, 기능, 스텝 등)은 세로로 쌓기
    - 좌우 padding: 24px~40px
+   - **position: fixed, position: sticky 절대 금지** — 모든 요소는 static 또는 relative만 사용
+     → Puppeteer fullPage 스크린샷 시 fixed/sticky 요소가 반복 렌더링됨
 6. Puppeteer 750px 뷰포트로 PNG 렌더링 (반응형 미디어쿼리 불필요)
 7. JavaScript 사용 금지
 8. 실제 제품 정보(이름, 가격, 후기 등)를 HTML에 직접 삽입
