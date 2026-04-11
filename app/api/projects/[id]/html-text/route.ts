@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getProjectPaths } from '@/lib/projects'
-import fs from 'fs'
+import { loadProjectData, saveProjectData, downloadSection, listSections, uploadFinalPng, getPublicUrl } from '@/lib/supabase'
 import { load } from 'cheerio'
+import { PageDesign } from '@/lib/types'
 
 export interface TextBlock {
   eid: string
@@ -159,15 +159,12 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const p = getProjectPaths(id)
 
-  if (!fs.existsSync(p.htmlPage)) {
-    return NextResponse.json({ blocks: [] })
-  }
+  const html = await loadProjectData<string>(id, 'html_page')
+  if (!html) return NextResponse.json({ blocks: [] })
 
-  const html = fs.readFileSync(p.htmlPage, 'utf-8')
   const { html: taggedHtml, blocks, sectionImages } = extractBlocks(html)
-  fs.writeFileSync(p.htmlPage, taggedHtml, 'utf-8')
+  await saveProjectData(id, 'html_page', taggedHtml)
 
   return NextResponse.json({ blocks, sectionImages })
 }
@@ -178,15 +175,11 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const p = getProjectPaths(id)
 
-  if (!fs.existsSync(p.htmlPage)) {
-    return NextResponse.json({ error: 'page.html 없음' }, { status: 404 })
-  }
+  const html = await loadProjectData<string>(id, 'html_page')
+  if (!html) return NextResponse.json({ error: 'html_page 없음' }, { status: 404 })
 
   const updates = await req.json() as Array<{ eid: string; text: string }>
-
-  const html = fs.readFileSync(p.htmlPage, 'utf-8')
   const $ = load(html)
 
   for (const { eid, text } of updates) {
@@ -209,11 +202,24 @@ export async function PUT(
     }
   }
 
-  fs.writeFileSync(p.htmlPage, $.html(), 'utf-8')
+  const updatedHtml = $.html()
+  await saveProjectData(id, 'html_page', updatedHtml)
 
   try {
-    const { renderToPng } = await import('@/lib/renderer')
-    await renderToPng(p.htmlPage, p.finalPng)
+    const pageDesign = await loadProjectData<PageDesign>(id, 'page_design')
+    if (pageDesign) {
+      const sectionBuffers: Record<string, Buffer> = {}
+      const existingSections = await listSections(id)
+      for (const imgReq of pageDesign.images) {
+        if (existingSections.includes(imgReq.id)) {
+          const buf = await downloadSection(id, imgReq.id)
+          if (buf) sectionBuffers[imgReq.id] = buf
+        }
+      }
+      const { renderToPng } = await import('@/lib/renderer')
+      const finalBuffer = await renderToPng(pageDesign.html, sectionBuffers)
+      await uploadFinalPng(id, finalBuffer)
+    }
     return NextResponse.json({ saved: true, rendered: true })
   } catch (err) {
     return NextResponse.json({ saved: true, rendered: false, renderError: String(err) })

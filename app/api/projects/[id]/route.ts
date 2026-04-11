@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import fs from 'fs'
-import { getProjectPaths, loadJson, getProjectStatus, deleteProject, renameProject, listProjects } from '@/lib/projects'
+import { getProjectStatus, deleteProject, renameProject, listProjects } from '@/lib/projects'
+import { loadProjectData } from '@/lib/supabase'
 
 export async function GET(
   _req: NextRequest,
@@ -8,13 +8,14 @@ export async function GET(
 ) {
   const { id } = await params
   try {
-    const p = getProjectPaths(id)
-    if (!fs.existsSync(p.base)) {
-      return NextResponse.json({ error: '프로젝트를 찾을 수 없습니다.' }, { status: 404 })
+    const [brief, status] = await Promise.all([
+      loadProjectData(id, 'brief'),
+      getProjectStatus(id),
+    ])
+    if (brief === null && !status.hasBrief) {
+      // 프로젝트가 존재하는지 확인 (brief가 없어도 존재할 수 있음)
     }
-    const meta = loadJson(p.meta) || { id, name: id, created_at: '', updated_at: '' }
-    const status = getProjectStatus(id)
-    return NextResponse.json({ ...meta, id, status })
+    return NextResponse.json({ id, status })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
@@ -30,7 +31,7 @@ export async function PATCH(
     if (!name?.trim()) {
       return NextResponse.json({ error: '이름을 입력하세요.' }, { status: 400 })
     }
-    renameProject(id, name.trim())
+    await renameProject(id, name.trim())
     return NextResponse.json({ ok: true })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
@@ -43,8 +44,8 @@ export async function DELETE(
 ) {
   const { id } = await params
   try {
-    deleteProject(id)
-    const remaining = listProjects()
+    await deleteProject(id)
+    const remaining = await listProjects()
     return NextResponse.json({ deleted: true, remaining })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })

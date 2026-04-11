@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import fs from 'fs'
-import path from 'path'
-import { getProjectPaths } from '@/lib/projects'
+import { listPhotos, uploadPhoto, deleteAllPhotos } from '@/lib/supabase'
 import { PHOTO_EXTS } from '@/lib/constants'
 
 export async function GET(
@@ -10,14 +8,7 @@ export async function GET(
 ) {
   const { id } = await params
   try {
-    const p = getProjectPaths(id)
-    if (!fs.existsSync(p.photos)) {
-      return NextResponse.json([])
-    }
-    const photos = fs
-      .readdirSync(p.photos)
-      .filter((f) => PHOTO_EXTS.some((ext) => f.toLowerCase().endsWith(ext)))
-      .sort()
+    const photos = await listPhotos(id)
     return NextResponse.json(photos)
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
@@ -30,11 +21,6 @@ export async function POST(
 ) {
   const { id } = await params
   try {
-    const p = getProjectPaths(id)
-    if (!fs.existsSync(p.photos)) {
-      fs.mkdirSync(p.photos, { recursive: true })
-    }
-
     const formData = await req.formData()
     const files = formData.getAll('photos') as File[]
 
@@ -44,11 +30,17 @@ export async function POST(
 
     const saved: string[] = []
     for (const file of files) {
+      const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
+      if (!PHOTO_EXTS.some((e) => e === `.${ext}`)) continue
+
       const arrayBuffer = await file.arrayBuffer()
       const buffer = Buffer.from(arrayBuffer)
       const filename = file.name.replace(/[^a-zA-Z0-9가-힣._-]/g, '_')
-      const destPath = path.join(p.photos, filename)
-      fs.writeFileSync(destPath, buffer)
+      const mimeMap: Record<string, string> = {
+        jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp',
+      }
+      const mimeType = mimeMap[ext] ?? 'image/jpeg'
+      await uploadPhoto(id, filename, buffer, mimeType)
       saved.push(filename)
     }
 
@@ -64,19 +56,8 @@ export async function DELETE(
 ) {
   const { id } = await params
   try {
-    const p = getProjectPaths(id)
-    if (!fs.existsSync(p.photos)) {
-      return NextResponse.json({ deleted: 0 })
-    }
-    const photos = fs
-      .readdirSync(p.photos)
-      .filter((f) => PHOTO_EXTS.some((ext) => f.toLowerCase().endsWith(ext)))
-
-    for (const photo of photos) {
-      fs.unlinkSync(path.join(p.photos, photo))
-    }
-
-    return NextResponse.json({ deleted: photos.length })
+    await deleteAllPhotos(id)
+    return NextResponse.json({ ok: true })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }

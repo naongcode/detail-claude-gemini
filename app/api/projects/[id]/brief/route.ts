@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import fs from 'fs'
-import { getProjectPaths, loadJson, saveJson } from '@/lib/projects'
+import { loadProjectData, saveProjectData } from '@/lib/supabase'
 
 export async function GET(
   _req: NextRequest,
@@ -8,9 +7,8 @@ export async function GET(
 ) {
   const { id } = await params
   try {
-    const p = getProjectPaths(id)
-    if (!fs.existsSync(p.brief)) return NextResponse.json(null)
-    return NextResponse.json(loadJson(p.brief))
+    const brief = await loadProjectData(id, 'brief')
+    return NextResponse.json(brief)
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
@@ -23,8 +21,7 @@ export async function PUT(
   const { id } = await params
   try {
     const body = await req.json()
-    const p = getProjectPaths(id)
-    saveJson(p.brief, body)
+    await saveProjectData(id, 'brief', body)
     return NextResponse.json({ saved: true })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })

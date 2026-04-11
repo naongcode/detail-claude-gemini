@@ -3,7 +3,7 @@ import { listProjects, createProject } from '@/lib/projects'
 
 export async function GET() {
   try {
-    const projects = listProjects()
+    const projects = await listProjects()
     return NextResponse.json(projects)
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     if (!name?.trim()) {
       return NextResponse.json({ error: '프로젝트 이름을 입력하세요.' }, { status: 400 })
     }
-    const id = createProject(name.trim())
+    const id = await createProject(name.trim())
     return NextResponse.json({ id, name: name.trim() }, { status: 201 })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })

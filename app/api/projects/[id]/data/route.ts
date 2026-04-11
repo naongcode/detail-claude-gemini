@@ -1,15 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import fs from 'fs'
-import path from 'path'
-import { getProjectPaths, loadJson, saveJson } from '@/lib/projects'
+import { loadProjectData, saveProjectData, getProjectRow } from '@/lib/supabase'
+import { downloadSection, listSections, uploadFinalPng, getPublicUrl } from '@/lib/supabase'
 import { PageDesign } from '@/lib/types'
 
 type DataKey = 'research' | 'pageDesign'
-
-const DATA_KEY_MAP: Record<DataKey, keyof ReturnType<typeof getProjectPaths>> = {
-  research: 'research',
-  pageDesign: 'pageDesign',
-}
 
 export async function GET(
   req: NextRequest,
@@ -19,21 +13,19 @@ export async function GET(
   const key = req.nextUrl.searchParams.get('key') as DataKey | null
 
   try {
-    const p = getProjectPaths(id)
-
-    if (key && DATA_KEY_MAP[key]) {
-      const filePath = p[DATA_KEY_MAP[key]] as string
-      if (!fs.existsSync(filePath)) return NextResponse.json(null)
-      return NextResponse.json(loadJson(filePath))
+    if (key === 'research') {
+      return NextResponse.json(await loadProjectData(id, 'research'))
+    }
+    if (key === 'pageDesign') {
+      return NextResponse.json(await loadProjectData(id, 'page_design'))
     }
 
-    // Return all data files
-    const result: Record<string, unknown> = {}
-    for (const [k, pathKey] of Object.entries(DATA_KEY_MAP)) {
-      const filePath = p[pathKey as keyof typeof p] as string
-      result[k] = fs.existsSync(filePath) ? loadJson(filePath) : null
-    }
-    return NextResponse.json(result)
+    // 전체 반환
+    const row = await getProjectRow(id)
+    return NextResponse.json({
+      research: row?.research ?? null,
+      pageDesign: row?.page_design ?? null,
+    })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
@@ -47,31 +39,39 @@ export async function PUT(
   const key = req.nextUrl.searchParams.get('key') as DataKey | null
 
   try {
-    if (!key || !DATA_KEY_MAP[key]) {
+    if (!key || !['research', 'pageDesign'].includes(key)) {
       return NextResponse.json({ error: '유효한 key가 필요합니다 (research|pageDesign)' }, { status: 400 })
     }
 
     const body = await req.json()
-    const p = getProjectPaths(id)
-    const filePath = p[DATA_KEY_MAP[key]] as string
-    saveJson(filePath, body)
+    const field = key === 'pageDesign' ? 'page_design' : 'research'
+    await saveProjectData(id, field, body)
 
-    // pageDesign 저장 시 page.html 재조립 + Puppeteer 재렌더
+    // pageDesign 저장 시 html_page 재조립 + 재렌더링
     if (key === 'pageDesign') {
       const pageDesign = body as PageDesign
-      let html = pageDesign.html
+      const existingSections = await listSections(id)
+
+      const sectionBuffers: Record<string, Buffer> = {}
       for (const imgReq of pageDesign.images) {
-        const imgPath = path.join(p.sections, `${imgReq.id}.png`)
-        if (fs.existsSync(imgPath)) {
-          const fileUrl = `file:///${imgPath.replace(/\\/g, '/')}`
-          html = html.replaceAll(`__GEN_${imgReq.id}__`, fileUrl)
+        if (existingSections.includes(imgReq.id)) {
+          const buf = await downloadSection(id, imgReq.id)
+          if (buf) sectionBuffers[imgReq.id] = buf
         }
       }
-      fs.writeFileSync(p.htmlPage, html, 'utf-8')
 
       try {
         const { renderToPng } = await import('@/lib/renderer')
-        await renderToPng(p.htmlPage, p.finalPng)
+        const finalBuffer = await renderToPng(pageDesign.html, sectionBuffers)
+        await uploadFinalPng(id, finalBuffer)
+
+        let html = pageDesign.html
+        for (const imgReq of pageDesign.images) {
+          const url = getPublicUrl(id, 'section', `${imgReq.id}.png`)
+          html = html.replaceAll(`__GEN_${imgReq.id}__`, url)
+        }
+        await saveProjectData(id, 'html_page', html)
+
         return NextResponse.json({ saved: true, rendered: true })
       } catch (renderErr) {
         return NextResponse.json({ saved: true, rendered: false, renderError: String(renderErr) })

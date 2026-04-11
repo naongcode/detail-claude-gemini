@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateBrief } from '@/lib/openai-pipeline'
-import { getProjectPaths, saveJson } from '@/lib/projects'
+import { saveProjectData } from '@/lib/supabase'
 
 export const maxDuration = 60
 
@@ -17,8 +17,7 @@ export async function POST(
     }
 
     const brief = await generateBrief(description.trim())
-    const p = getProjectPaths(id)
-    saveJson(p.brief, brief)
+    await saveProjectData(id, 'brief', brief)
 
     return NextResponse.json(brief)
   } catch (err) {

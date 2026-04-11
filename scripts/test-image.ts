@@ -65,16 +65,23 @@ async function main() {
   const htmlPath = path.join(outDir, 'preview.html')
   const pngPath = path.join(outDir, 'preview.png')
 
-  // 제품 사진 경로 (있으면 전달)
+  // 제품 사진 버퍼로 읽기 (있으면 전달)
   const photosDir = path.join(projectDir, 'product_photos')
-  const productPhotos = fs.existsSync(photosDir)
-    ? fs.readdirSync(photosDir).map(f => path.join(photosDir, f))
+  const mimeMap: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' }
+  const productPhotos: Array<{ data: Buffer; mimeType: string }> = fs.existsSync(photosDir)
+    ? fs.readdirSync(photosDir)
+        .filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f))
+        .map(f => {
+          const ext = f.split('.').pop()?.toLowerCase() ?? ''
+          return { data: fs.readFileSync(path.join(photosDir, f)), mimeType: mimeMap[ext] ?? 'image/jpeg' }
+        })
     : []
 
   // 이미지 생성
   console.log('\n🔄 Gemini 이미지 생성 중...')
   const t0 = Date.now()
-  await generateSectionImage(img.prompt, img.width, img.height, imgPath, productPhotos)
+  const imgBuffer = await generateSectionImage(img.prompt, img.width, img.height, productPhotos)
+  fs.writeFileSync(imgPath, imgBuffer)
   console.log(`✅ 생성 완료 (${((Date.now() - t0) / 1000).toFixed(1)}s) → ${imgPath}`)
 
   // 750px 틀 HTML 생성
@@ -112,7 +119,9 @@ async function main() {
 
   // Puppeteer 렌더링
   console.log('\n🖥️  Puppeteer 렌더링 중...')
-  await renderToPng(htmlPath, pngPath)
+  const sectionBuffers: Record<string, Buffer> = { [img.id]: imgBuffer }
+  const pngBuffer = await renderToPng(html, sectionBuffers)
+  fs.writeFileSync(pngPath, pngBuffer)
   console.log(`✅ 렌더 완료 → ${pngPath}`)
   console.log('\n🎉 완료! 아래 파일을 확인하세요:')
   console.log(`   이미지  : ${imgPath}`)
