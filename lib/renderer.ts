@@ -40,10 +40,7 @@ export async function renderToPng(
       const browser = await puppeteer.launch({
         args: chromium.args,
         defaultViewport: { width: 750, height: 1000 },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        executablePath: await (chromium.executablePath as any)(
-          'https://github.com/Sparticuz/chromium/releases/download/v147.0.0/chromium-v147.0.0-pack.tar'
-        ),
+        executablePath: await chromium.executablePath(),
         headless: true,
       })
       try {
