@@ -76,18 +76,14 @@ export async function deleteProject(pid: string): Promise<void> {
   const supabase = getClient()
 
   // Storage 파일 전체 삭제
-  const { data: files } = await supabase.storage.from(BUCKET).list(pid, { limit: 1000 })
-  if (files && files.length > 0) {
-    // 하위 폴더(photos, sections)도 삭제
-    for (const folder of ['photos', 'sections']) {
-      const { data: sub } = await supabase.storage.from(BUCKET).list(`${pid}/${folder}`, { limit: 1000 })
-      if (sub && sub.length > 0) {
-        await supabase.storage.from(BUCKET).remove(sub.map((f) => `${pid}/${folder}/${f.name}`))
-      }
+  const key = toStorageKey(pid)
+  for (const folder of ['photos', 'sections']) {
+    const { data: sub } = await supabase.storage.from(BUCKET).list(`${key}/${folder}`, { limit: 1000 })
+    if (sub && sub.length > 0) {
+      await supabase.storage.from(BUCKET).remove(sub.map((f) => `${key}/${folder}/${f.name}`))
     }
-    // final.png
-    await supabase.storage.from(BUCKET).remove([`${pid}/final.png`])
   }
+  await supabase.storage.from(BUCKET).remove([`${key}/final.png`])
 
   // DB 행 삭제
   const { error } = await supabase.from('projects').delete().eq('id', pid)
@@ -233,7 +229,8 @@ export async function downloadSection(pid: string, sectionId: string): Promise<B
 
 export async function listSections(pid: string): Promise<string[]> {
   const supabase = getClient()
-  const { data, error } = await supabase.storage.from(BUCKET).list(`${pid}/sections`, { limit: 100 })
+  const key = toStorageKey(pid)
+  const { data, error } = await supabase.storage.from(BUCKET).list(`${key}/sections`, { limit: 100 })
   if (error || !data) return []
   return data.map((f) => f.name.replace('.png', '')).sort()
 }
