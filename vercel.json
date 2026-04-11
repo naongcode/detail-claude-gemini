@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "app/api/projects/[id]/generate/render/route.ts": {
+      "includeFiles": "node_modules/@sparticuz/chromium/**"
+    }
+  }
+}
