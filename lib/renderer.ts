@@ -59,12 +59,7 @@ export async function renderToPng(
         await page.setViewport({ width: 750, height: 1000 })
         await page.goto(`file:///${htmlPath.replace(/\\/g, '/')}`, { waitUntil: 'networkidle0', timeout: 60000 })
 
-        // ── 5. position: static 강제 (fixed/sticky 반복 렌더링 방지) ─────────
-        // fullPage 스크린샷 시 fixed/sticky 요소가 스크롤 구간마다 중복 캡처됨
-        // ⚠️ position: relative도 static으로 바뀌어 레이아웃에 영향 줄 수 있음
-        await page.addStyleTag({ content: '*, *::before, *::after { position: static !important; animation: none !important; transition: none !important; }' })
-
-        // ── 6. 전체 높이 측정 후 뷰포트 재설정 ─────────────────────────────
+        // ── 5. 전체 높이 측정 후 뷰포트 재설정 ─────────────────────────────
         // ⚠️ 핵심 문제 지점:
         //   setViewport(fullHeight) 직후 fullPage:true 로 캡처하면
         //   Puppeteer가 내부적으로 스크롤 높이를 재계산하는 타이밍에
@@ -87,7 +82,6 @@ export async function renderToPng(
         const page = await browser.newPage()
         await page.setViewport({ width: 750, height: 1000 })
         await page.goto(`file:///${htmlPath.replace(/\\/g, '/')}`, { waitUntil: 'networkidle0', timeout: 60000 })
-        await page.addStyleTag({ content: '*, *::before, *::after { position: static !important; animation: none !important; transition: none !important; }' })
         const fullHeight = await page.evaluate(() => document.body.scrollHeight)
         await page.setViewport({ width: 750, height: fullHeight })
         await page.screenshot({ path: pngPath as `${string}.png`, fullPage: true })

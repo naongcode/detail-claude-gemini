@@ -90,6 +90,8 @@ export async function generateDetailPage(
    - 좌우 padding: 24px~40px
    - **position: fixed, position: sticky 절대 금지** — 모든 요소는 static 또는 relative만 사용
      → Puppeteer fullPage 스크린샷 시 fixed/sticky 요소가 반복 렌더링됨
+   - **이모지(😊🎯✅ 등) 절대 금지** — 렌더링 서버에 이모지 폰트 없음, 빈 박스로 출력됨
+     → 대신 텍스트 부호(✓ · → ※ ● ▶ ■)나 순수 텍스트 사용
 6. Puppeteer 750px 뷰포트로 PNG 렌더링 (반응형 미디어쿼리 불필요)
 7. JavaScript 사용 금지
 8. 실제 제품 정보(이름, 가격, 후기 등)를 HTML에 직접 삽입
