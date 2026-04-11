@@ -34,13 +34,15 @@ export async function renderToPng(
 
   try {
     if (IS_VERCEL) {
-      const chromium = (await import('@sparticuz/chromium')).default
+      const chromium = (await import('@sparticuz/chromium-min')).default
       const puppeteer = (await import('puppeteer-core')).default
 
       const browser = await puppeteer.launch({
         args: chromium.args,
         defaultViewport: { width: 750, height: 1000 },
-        executablePath: await chromium.executablePath(),
+        executablePath: await chromium.executablePath(
+          'https://github.com/Sparticuz/chromium/releases/download/v147.0.0/chromium-v147.0.0-pack.tar'
+        ),
         headless: true,
       })
       try {
