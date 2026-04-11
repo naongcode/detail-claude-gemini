@@ -66,7 +66,8 @@ function getSectionKey($el: ReturnType<ReturnType<typeof load>>, $: ReturnType<t
   }
 
   // Pass 3: direct child of <body> — use id or first meaningful class
-  node = $el
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  node = $el as any
   while (node.length) {
     const parentTag = node.parent().prop('tagName')?.toLowerCase()
     if (parentTag === 'body') {
