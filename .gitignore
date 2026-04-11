@@ -42,3 +42,5 @@ next-env.d.ts
 
 # generated project data
 /projects/
+
+.vercel
