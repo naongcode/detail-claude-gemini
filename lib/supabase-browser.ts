@@ -8,12 +8,20 @@ export const supabaseBrowser = createClient(
 
 export const BUCKET = 'project-assets'
 
+function toStorageKey(pid: string): string {
+  return pid
+    .replace(/[^\x00-\x7F]/g, '')
+    .replace(/[^a-zA-Z0-9_\-]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '')
+}
+
 export async function uploadPhotoFromBrowser(
   pid: string,
   file: File
 ): Promise<string> {
-  const filename = file.name.replace(/[^a-zA-Z0-9가-힣._-]/g, '_')
-  const filePath = `${pid}/photos/${filename}`
+  const filename = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+  const filePath = `${toStorageKey(pid)}/photos/${filename}`
 
   const { error } = await supabaseBrowser.storage
     .from(BUCKET)
