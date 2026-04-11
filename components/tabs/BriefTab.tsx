@@ -115,34 +115,15 @@ export default function BriefTab({ projectId, projectStatus, onStatusChange, onT
     if (!files || files.length === 0) return
     setPhotoSaving(true)
     try {
-      const fileArray = Array.from(files)
-
-      // 1. 서버에서 signed URL 발급
-      const res = await fetch(`/api/projects/${projectId}/photos`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filenames: fileArray.map((f) => f.name) }),
-      })
-      if (!res.ok) { alert('업로드 URL 발급 실패'); return }
-      const { urls } = await res.json() as { urls: Array<{ filename: string; signedUrl: string }> }
-
-      // 2. 각 파일을 Supabase Storage에 직접 업로드
-      await Promise.all(
-        urls.map(({ filename, signedUrl }) => {
-          const file = fileArray.find(
-            (f) => f.name.replace(/[^a-zA-Z0-9가-힣._-]/g, '_') === filename
-          ) ?? fileArray.find((f) => f.name === filename) ?? fileArray[0]
-          return fetch(signedUrl, {
-            method: 'PUT',
-            headers: { 'Content-Type': file.type || 'image/jpeg', 'x-upsert': 'true' },
-            body: file,
-          })
-        })
-      )
-
+      const { uploadPhotoFromBrowser } = await import('@/lib/supabase-browser')
+      await Promise.all(Array.from(files).map((file) => uploadPhotoFromBrowser(projectId, file)))
       await fetchPhotos()
       onStatusChange()
-    } finally { setPhotoSaving(false) }
+    } catch (e) {
+      alert(`업로드 실패: ${String(e)}`)
+    } finally {
+      setPhotoSaving(false)
+    }
   }
 
   const handleDeletePhotos = async () => {
