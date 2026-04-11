@@ -9,7 +9,8 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params
+  const { id: _id } = await params
+  const id = decodeURIComponent(_id)
   const key = req.nextUrl.searchParams.get('key') as DataKey | null
 
   try {
@@ -35,7 +36,8 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params
+  const { id: _id } = await params
+  const id = decodeURIComponent(_id)
   const key = req.nextUrl.searchParams.get('key') as DataKey | null
 
   try {

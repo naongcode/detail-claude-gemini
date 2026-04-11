@@ -23,9 +23,11 @@ export function getTmpPaths(pid: string) {
 function slugify(text: string): string {
   return text
     .trim()
-    .replace(/[^\w\s가-힣]/g, '')
+    .replace(/[^a-zA-Z0-9\s]/g, '_')
     .replace(/\s+/g, '_')
-    .slice(0, 40) || 'project'
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '')
+    .slice(0, 20) || 'project'
 }
 
 export function newProjectId(name: string): string {

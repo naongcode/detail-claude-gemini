@@ -6,5 +6,5 @@ interface Props {
 
 export default async function ProjectPage({ params }: Props) {
   const { id } = await params
-  return <AppLayout projectId={id} />
+  return <AppLayout projectId={decodeURIComponent(id)} />
 }

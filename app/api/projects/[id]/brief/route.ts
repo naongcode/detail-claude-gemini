@@ -5,7 +5,8 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params
+  const { id: _id } = await params
+  const id = decodeURIComponent(_id)
   try {
     const brief = await loadProjectData(id, 'brief')
     return NextResponse.json(brief)
@@ -18,7 +19,8 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params
+  const { id: _id } = await params
+  const id = decodeURIComponent(_id)
   try {
     const body = await req.json()
     await saveProjectData(id, 'brief', body)

@@ -158,7 +158,8 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params
+  const { id: _id } = await params
+  const id = decodeURIComponent(_id)
 
   const html = await loadProjectData<string>(id, 'html_page')
   if (!html) return NextResponse.json({ blocks: [] })
@@ -174,7 +175,8 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params
+  const { id: _id } = await params
+  const id = decodeURIComponent(_id)
 
   const html = await loadProjectData<string>(id, 'html_page')
   if (!html) return NextResponse.json({ error: 'html_page 없음' }, { status: 404 })

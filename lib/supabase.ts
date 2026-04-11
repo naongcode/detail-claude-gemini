@@ -117,6 +117,17 @@ export async function saveProjectData(pid: string, field: DataField, value: unkn
   if (error) throw error
 }
 
+export async function getProjectName(pid: string): Promise<string | null> {
+  const supabase = getClient()
+  const { data, error } = await supabase
+    .from('projects')
+    .select('name')
+    .eq('id', pid)
+    .single()
+  if (error || !data) return null
+  return (data as { name: string }).name
+}
+
 export async function getProjectRow(pid: string): Promise<{
   brief: ProductBrief | null
   research: ResearchOutput | null
@@ -166,16 +177,18 @@ export async function createSignedUploadUrl(pid: string, filename: string): Prom
 
 export async function listPhotos(pid: string): Promise<string[]> {
   const supabase = getClient()
-  const { data, error } = await supabase.storage.from(BUCKET).list(`${pid}/photos`, { limit: 100 })
+  const key = toStorageKey(pid)
+  const { data, error } = await supabase.storage.from(BUCKET).list(`${key}/photos`, { limit: 100 })
   if (error || !data) return []
   return data.map((f) => f.name).sort()
 }
 
 export async function deleteAllPhotos(pid: string): Promise<void> {
   const supabase = getClient()
-  const { data } = await supabase.storage.from(BUCKET).list(`${pid}/photos`, { limit: 100 })
+  const key = toStorageKey(pid)
+  const { data } = await supabase.storage.from(BUCKET).list(`${key}/photos`, { limit: 100 })
   if (!data || data.length === 0) return
-  await supabase.storage.from(BUCKET).remove(data.map((f) => `${pid}/photos/${f.name}`))
+  await supabase.storage.from(BUCKET).remove(data.map((f) => `${key}/photos/${f.name}`))
 }
 
 export async function downloadPhoto(pid: string, filename: string): Promise<{ buffer: Buffer; mimeType: string } | null> {

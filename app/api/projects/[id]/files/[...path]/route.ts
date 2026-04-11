@@ -5,7 +5,8 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string; path: string[] }> }
 ) {
-  const { id, path: filePath } = await params
+  const { id: _id, path: filePath } = await params
+  const id = decodeURIComponent(_id)
   try {
     const joined = filePath.join('/')
 

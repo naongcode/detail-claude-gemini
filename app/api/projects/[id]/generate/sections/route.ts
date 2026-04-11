@@ -20,7 +20,8 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params
+  const { id: _id } = await params
+  const id = decodeURIComponent(_id)
   const body = await req.json() as { sections: SectionRequest[] }
   const sectionRequests: SectionRequest[] = body.sections ?? []
 

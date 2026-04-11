@@ -1,21 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getProjectStatus, deleteProject, renameProject, listProjects } from '@/lib/projects'
-import { loadProjectData } from '@/lib/supabase'
+import { getProjectName } from '@/lib/supabase'
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params
+  const { id: _id } = await params
+  const id = decodeURIComponent(_id)
   try {
-    const [brief, status] = await Promise.all([
-      loadProjectData(id, 'brief'),
+    const [name, status] = await Promise.all([
+      getProjectName(id),
       getProjectStatus(id),
     ])
-    if (brief === null && !status.hasBrief) {
-      // 프로젝트가 존재하는지 확인 (brief가 없어도 존재할 수 있음)
-    }
-    return NextResponse.json({ id, status })
+    return NextResponse.json({ id, name, status })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
@@ -25,7 +23,8 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params
+  const { id: _id } = await params
+  const id = decodeURIComponent(_id)
   try {
     const { name } = await req.json()
     if (!name?.trim()) {
@@ -42,7 +41,8 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params
+  const { id: _id } = await params
+  const id = decodeURIComponent(_id)
   try {
     await deleteProject(id)
     const remaining = await listProjects()
