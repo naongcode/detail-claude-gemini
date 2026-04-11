@@ -3,6 +3,8 @@ import { loadProjectData } from '@/lib/projects'
 import { uploadFinalPng, downloadSection, saveProjectData, getPublicUrl } from '@/lib/supabase'
 import { PageDesign } from '@/lib/types'
 
+export const runtime = 'nodejs'
+
 export const maxDuration = 120
 
 export async function POST(
