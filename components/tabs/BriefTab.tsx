@@ -129,10 +129,12 @@ export default function BriefTab({ projectId, projectStatus, onStatusChange, onT
       // 2. 각 파일을 Supabase Storage에 직접 업로드
       await Promise.all(
         urls.map(({ filename, signedUrl }) => {
-          const file = fileArray.find((f) => f.name.replace(/[^a-zA-Z0-9가-힣._-]/g, '_') === filename) ?? fileArray[0]
+          const file = fileArray.find(
+            (f) => f.name.replace(/[^a-zA-Z0-9가-힣._-]/g, '_') === filename
+          ) ?? fileArray.find((f) => f.name === filename) ?? fileArray[0]
           return fetch(signedUrl, {
             method: 'PUT',
-            headers: { 'Content-Type': file.type || 'image/jpeg' },
+            headers: { 'Content-Type': file.type || 'image/jpeg', 'x-upsert': 'true' },
             body: file,
           })
         })

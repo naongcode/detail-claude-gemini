@@ -153,7 +153,7 @@ export async function uploadPhoto(
 export async function createSignedUploadUrl(pid: string, filename: string): Promise<{ signedUrl: string; token: string; path: string }> {
   const supabase = getClient()
   const filePath = storagePath(pid, 'photo', filename)
-  const { data, error } = await supabase.storage.from(BUCKET).createSignedUploadUrl(filePath)
+  const { data, error } = await supabase.storage.from(BUCKET).createSignedUploadUrl(filePath, { upsert: true })
   if (error || !data) throw error ?? new Error('signed URL 생성 실패')
   return { signedUrl: data.signedUrl, token: data.token, path: data.path }
 }
