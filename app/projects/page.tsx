@@ -20,6 +20,7 @@ export default function ProjectsPage() {
 
   async function fetchProjects() {
     const res = await fetch('/api/projects')
+    if (res.status === 401) { router.push('/login'); return }
     const data = await res.json()
     setProjects(Array.isArray(data) ? data : [])
   }
