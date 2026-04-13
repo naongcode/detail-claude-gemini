@@ -28,6 +28,8 @@ export default function AppLayout({ projectId }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>('brief')
   const [projects, setProjects] = useState<ProjectMeta[]>([])
   const [projectStatus, setProjectStatus] = useState<ProjectStatus | null>(null)
+  const [creditBalance, setCreditBalance] = useState<number | null>(null)
+
   const refreshProjects = useCallback(async () => {
     const res = await fetch('/api/projects')
     if (res.ok) {
@@ -44,10 +46,19 @@ export default function AppLayout({ projectId }: Props) {
     }
   }, [projectId])
 
+  const refreshCredits = useCallback(async () => {
+    const res = await fetch('/api/credits')
+    if (res.ok) {
+      const data = await res.json()
+      setCreditBalance(data.balance)
+    }
+  }, [])
+
   useEffect(() => {
     refreshProjects()
     refreshStatus()
-  }, [refreshProjects, refreshStatus])
+    refreshCredits()
+  }, [refreshProjects, refreshStatus, refreshCredits])
 
   const handleSignOut = async () => {
     const supabase = createBrowserClient(
@@ -85,7 +96,10 @@ export default function AppLayout({ projectId }: Props) {
     }
   }
 
-  const triggerStatusRefresh = refreshStatus
+  const triggerStatusRefresh = useCallback(async () => {
+    await refreshStatus()
+    await refreshCredits()
+  }, [refreshStatus, refreshCredits])
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
@@ -120,12 +134,19 @@ export default function AppLayout({ projectId }: Props) {
           {projectStatus?.hasFinalPng && (
             <span className="shrink-0 text-xs px-2.5 py-1 rounded-full bg-green-100 text-green-700 font-medium">완성</span>
           )}
-          <button
-            onClick={handleSignOut}
-            className="ml-auto shrink-0 text-xs text-slate-400 hover:text-slate-600 transition-colors"
-          >
-            로그아웃
-          </button>
+          <div className="ml-auto flex items-center gap-3 shrink-0">
+            {creditBalance !== null && (
+              <span className="text-xs font-medium text-slate-600 bg-slate-100 px-2.5 py-1 rounded-full">
+                크레딧 {creditBalance}개
+              </span>
+            )}
+            <button
+              onClick={handleSignOut}
+              className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              로그아웃
+            </button>
+          </div>
         </div>
 
         {/* Tabs */}

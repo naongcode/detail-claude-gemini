@@ -5,6 +5,7 @@ import { generateDetailPage } from '@/lib/claude'
 import { ProductBrief, ResearchOutput, PageDesign } from '@/lib/types'
 import { sse, sseResponse } from '@/lib/sse'
 import { requireAuth, unauthorizedResponse } from '@/lib/auth'
+import { deductCredit } from '@/lib/credits'
 
 export const maxDuration = 300
 
@@ -12,14 +13,22 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  let userId: string
   try {
-    await requireAuth()
+    const user = await requireAuth()
+    userId = user.id
   } catch {
     return unauthorizedResponse()
   }
 
   const { id: _id } = await params
   const id = decodeURIComponent(_id)
+
+  try {
+    await deductCredit(userId, id)
+  } catch (err) {
+    return NextResponse.json({ error: String(err) }, { status: 402 })
+  }
 
   const stream = new ReadableStream({
     async start(controller) {
