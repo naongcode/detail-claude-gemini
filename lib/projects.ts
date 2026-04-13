@@ -1,22 +1,5 @@
-import path from 'path'
 import { ProjectMeta, ProjectStatus, PageDesign } from './types'
 import * as sb from './supabase'
-
-// ── /tmp 경로 (Puppeteer 렌더링용 임시 스크래치) ─────────────────────────────
-
-export function getTmpDir(pid: string): string {
-  return path.join('/tmp', 'projects', pid)
-}
-
-export function getTmpPaths(pid: string) {
-  const base = getTmpDir(pid)
-  return {
-    base,
-    sections: path.join(base, 'sections'),
-    htmlPage: path.join(base, 'page.html'),
-    finalPng: path.join(base, 'final_page.png'),
-  }
-}
 
 // ── ID 생성 ──────────────────────────────────────────────────────────────────
 
@@ -41,13 +24,13 @@ export function newProjectId(name: string): string {
 
 // ── 프로젝트 CRUD (async) ─────────────────────────────────────────────────────
 
-export async function listProjects(): Promise<ProjectMeta[]> {
-  return sb.listProjects()
+export async function listProjects(userId: string): Promise<ProjectMeta[]> {
+  return sb.listProjects(userId)
 }
 
-export async function createProject(name: string): Promise<string> {
+export async function createProject(name: string, userId: string): Promise<string> {
   const pid = newProjectId(name)
-  await sb.createProject(pid, name)
+  await sb.createProject(pid, name, userId)
   return pid
 }
 

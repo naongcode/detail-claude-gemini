@@ -1,4 +1,4 @@
-const MODEL = 'gemini-3-pro-image-preview'
+const MODEL = process.env.GEMINI_MODEL ?? 'gemini-3-pro-image-preview'
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`
 
 export async function generateSectionImage(

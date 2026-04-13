@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { ProductBrief, ProjectStatus, PipelineEvent, ImageRequest } from '@/lib/types'
-import ProgressLog, { LogEntry } from '@/components/ui/ProgressLog'
+import { useState, useEffect } from 'react'
+import { ProductBrief, ProjectStatus } from '@/lib/types'
+import PhotoUpload from './PhotoUpload'
+import PipelineRunner from './PipelineRunner'
 
 interface Props {
   projectId: string
@@ -54,25 +55,17 @@ export default function BriefTab({ projectId, projectStatus, onStatusChange, onT
   const [autoFilling, setAutoFilling] = useState(false)
   const [saving, setSaving] = useState(false)
   const [savedMsg, setSavedMsg] = useState('')
-  const [photoList, setPhotoList] = useState<string[]>([])
-  const [photoSaving, setPhotoSaving] = useState(false)
-  const [pipelineRunning, setPipelineRunning] = useState(false)
-  const [logs, setLogs] = useState<LogEntry[]>([])
-  const eventSourceRef = useRef<EventSource | null>(null)
 
-  useEffect(() => { fetchBrief(); fetchPhotos() }, [projectId])
+  useEffect(() => { fetchBrief() }, [projectId])
 
   const fetchBrief = async () => {
-    const res = await fetch(`/api/projects/${projectId}/brief`)
-    if (res.ok) {
-      const data = await res.json()
-      if (data) setBrief({ ...EMPTY_BRIEF, ...data })
-    }
-  }
-
-  const fetchPhotos = async () => {
-    const res = await fetch(`/api/projects/${projectId}/photos`)
-    if (res.ok) { const data = await res.json(); setPhotoList(data) }
+    try {
+      const res = await fetch(`/api/projects/${projectId}/brief`)
+      if (res.ok) {
+        const data = await res.json()
+        if (data) setBrief({ ...EMPTY_BRIEF, ...data })
+      }
+    } catch (e) { console.error('브리프 로드 실패:', e) }
   }
 
   const handleAutoFill = async () => {
@@ -111,162 +104,17 @@ export default function BriefTab({ projectId, projectStatus, onStatusChange, onT
     } finally { setSaving(false) }
   }
 
-  const handlePhotoUpload = async (files: FileList | null) => {
-    if (!files || files.length === 0) return
-    setPhotoSaving(true)
-    try {
-      const { uploadPhotoFromBrowser } = await import('@/lib/supabase-browser')
-      await Promise.all(Array.from(files).map((file) => uploadPhotoFromBrowser(projectId, file)))
-      await fetchPhotos()
-      onStatusChange()
-    } catch (e) {
-      alert(`업로드 실패: ${String(e)}`)
-    } finally {
-      setPhotoSaving(false)
-    }
-  }
-
-  const handleDeletePhotos = async () => {
-    const res = await fetch(`/api/projects/${projectId}/photos`, { method: 'DELETE' })
-    if (res.ok) { await fetchPhotos(); onStatusChange() }
-  }
-
-  const handleRunPipeline = () => {
-    if (pipelineRunning) return
-    setLogs([])
-    setPipelineRunning(true)
-    let finished = false
-
-    const es = new EventSource(`/api/projects/${projectId}/generate/pipeline`)
-    eventSourceRef.current = es
-
-    es.onmessage = (event) => {
-      try {
-        const data: PipelineEvent = JSON.parse(event.data)
-        if (data.type === 'step_done') return
-
-        const type: LogEntry['type'] =
-          data.type === 'error'        ? 'error' :
-          data.type === 'done'         ? 'success' :
-          data.type === 'design_ready' ? 'success' :
-          data.type === 'step'         ? 'step' : 'info'
-        const message =
-          data.type === 'error'        ? `오류: ${data.message}` :
-          data.type === 'done'         ? `✓ ${data.message}` :
-          data.type === 'design_ready' ? `✓ ${data.message}` :
-          `[${data.step}] ${data.message}`
-        setLogs((prev) => [...prev, { message, type, timestamp: new Date() }])
-
-        if (data.type === 'design_ready' && data.images) {
-          finished = true
-          es.close()
-          // 설계 완료 → 이미지 개별 생성 시작
-          runImageGeneration(data.images)
-        }
-        if (data.type === 'error') {
-          finished = true
-          es.close(); setPipelineRunning(false); onStatusChange()
-        }
-      } catch { /* ignore */ }
-    }
-    es.onerror = () => {
-      if (!finished) {
-        setLogs((prev) => [...prev, { message: 'SSE 연결 오류', type: 'error', timestamp: new Date() }])
-        setPipelineRunning(false)
-      }
-      es.close()
-    }
-  }
-
-  const runImageGeneration = async (images: ImageRequest[]) => {
-    const total = images.length
-    for (let i = 0; i < images.length; i++) {
-      const { id: sectionId } = images[i]
-      setLogs((prev) => [...prev, {
-        message: `[${i + 4}] 이미지 생성 중: ${sectionId} (${i + 1}/${total})`,
-        type: 'step',
-        timestamp: new Date(),
-      }])
-      try {
-        const res = await fetch(`/api/projects/${projectId}/generate/image`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sectionId }),
-        })
-        if (!res.ok) {
-          const err = await res.json()
-          throw new Error(err.error ?? '이미지 생성 실패')
-        }
-        onStatusChange()
-      } catch (err) {
-        setLogs((prev) => [...prev, { message: `오류: ${String(err)}`, type: 'error', timestamp: new Date() }])
-        setPipelineRunning(false)
-        return
-      }
-    }
-
-    // 모든 이미지 완료 → 최종 렌더링
-    setLogs((prev) => [...prev, { message: `[${total + 4}] HTML 조립 및 PNG 렌더링 중...`, type: 'step', timestamp: new Date() }])
-    try {
-      const res = await fetch(`/api/projects/${projectId}/generate/render`, { method: 'POST' })
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error ?? '렌더링 실패')
-      }
-      setLogs((prev) => [...prev, { message: '✓ 상세페이지 생성 완료!', type: 'success', timestamp: new Date() }])
-      onStatusChange()
-      onTabChange('result')
-    } catch (err) {
-      setLogs((prev) => [...prev, { message: `렌더링 오류: ${String(err)}`, type: 'error', timestamp: new Date() }])
-    } finally {
-      setPipelineRunning(false)
-    }
-  }
-
-  const handleStopPipeline = () => { eventSourceRef.current?.close(); setPipelineRunning(false) }
-
   const update = (field: keyof ProductBrief, value: unknown) => setBrief((prev) => ({ ...prev, [field]: value }))
   const updateNested = (field: keyof ProductBrief, key: string, value: string) =>
     setBrief((prev) => ({ ...prev, [field]: { ...(prev[field] as Record<string, string>), [key]: value } }))
 
   const getLabel = (key: string) => brief.field_labels?.[key] ?? DEFAULT_LABELS[key] ?? key
 
-  const pipelineSteps = [
-    { label: '리서치',     done: projectStatus?.hasResearch ?? false },
-    { label: '페이지 설계', done: projectStatus?.hasPageDesign ?? false },
-    { label: '이미지 생성', done: (projectStatus?.imageGenerated ?? 0) > 0 && projectStatus?.imageGenerated === projectStatus?.imageTotal },
-    { label: '최종 렌더',   done: projectStatus?.hasFinalPng ?? false },
-  ]
-
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-5">
 
       {/* Section: 제품사진 */}
-      <Card>
-        <SectionTitle icon="📷" title="제품사진 업로드" subtitle="Gemini가 실제 제품을 참조하여 이미지를 생성합니다 (선택)" />
-        <div className="flex items-center gap-2 mt-4">
-          <label className={`cursor-pointer text-sm px-4 py-2 rounded-xl font-medium border transition-colors ${photoSaving ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}`}>
-            {photoSaving ? '업로드 중...' : '📁 사진 선택'}
-            <input type="file" accept=".jpg,.jpeg,.png,.webp" multiple disabled={photoSaving} onChange={(e) => handlePhotoUpload(e.target.files)} className="hidden" />
-          </label>
-          <button
-            onClick={handleDeletePhotos}
-            disabled={photoList.length === 0}
-            className="text-sm text-red-500 border border-red-200 px-4 py-2 rounded-xl hover:bg-red-50 disabled:opacity-40 transition-colors"
-          >
-            모두 삭제
-          </button>
-        </div>
-        {photoList.length > 0 && (
-          <div className="flex flex-wrap gap-2 mt-3">
-            {photoList.map((name) => (
-              <span key={name} className="flex items-center gap-1 bg-green-50 text-green-700 text-xs px-3 py-1.5 rounded-full border border-green-200">
-                📷 {name}
-              </span>
-            ))}
-          </div>
-        )}
-      </Card>
+      <PhotoUpload projectId={projectId} onStatusChange={onStatusChange} />
 
       {/* Section: AI 자동완성 */}
       <Card className="bg-blue-50 border-blue-200">
@@ -355,51 +203,12 @@ export default function BriefTab({ projectId, projectStatus, onStatusChange, onT
       </Card>
 
       {/* Section: 파이프라인 */}
-      <Card>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <SectionTitle icon="🚀" title="AI 파이프라인 실행" subtitle="리서치 → 카피 → 디자인 → 이미지 프롬프트 → 13개 섹션 이미지 → 최종 스티칭" />
-          </div>
-          <div className="shrink-0">
-            {pipelineRunning ? (
-              <button onClick={handleStopPipeline} className="bg-red-500 text-white text-sm px-5 py-2.5 rounded-xl hover:bg-red-600 transition-colors font-semibold">
-                ■ 중지
-              </button>
-            ) : (
-              <button
-                onClick={handleRunPipeline}
-                disabled={!projectStatus?.hasBrief}
-                className="bg-green-600 text-white text-sm px-5 py-2.5 rounded-xl hover:bg-green-700 disabled:opacity-40 transition-colors font-semibold"
-              >
-                ▶ 실행
-              </button>
-            )}
-          </div>
-        </div>
-
-        {!projectStatus?.hasBrief && (
-          <div className="mt-4 flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-            <span>⚠️</span> 제품 정보를 먼저 저장하세요.
-          </div>
-        )}
-
-        {projectStatus && (
-          <div className="mt-4 grid grid-cols-4 gap-2">
-            {pipelineSteps.map(({ label, done }) => (
-              <div key={label} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium ${done ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-slate-100 text-slate-500'}`}>
-                <div className={`w-2 h-2 rounded-full shrink-0 ${done ? 'bg-green-500' : 'bg-slate-300'}`} />
-                {label}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {(logs.length > 0 || pipelineRunning) && (
-          <div className="mt-4">
-            <ProgressLog logs={logs} isRunning={pipelineRunning} />
-          </div>
-        )}
-      </Card>
+      <PipelineRunner
+        projectId={projectId}
+        projectStatus={projectStatus}
+        onStatusChange={onStatusChange}
+        onTabChange={onTabChange}
+      />
     </div>
   )
 }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { createBrowserClient } from '@supabase/ssr'
 import ProjectSidebar from './ProjectSidebar'
 import BriefTab from './tabs/BriefTab'
 import LayoutTab from './tabs/LayoutTab'
@@ -27,8 +28,6 @@ export default function AppLayout({ projectId }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>('brief')
   const [projects, setProjects] = useState<ProjectMeta[]>([])
   const [projectStatus, setProjectStatus] = useState<ProjectStatus | null>(null)
-  const [statusTick, setStatusTick] = useState(0)
-
   const refreshProjects = useCallback(async () => {
     const res = await fetch('/api/projects')
     if (res.ok) {
@@ -50,9 +49,14 @@ export default function AppLayout({ projectId }: Props) {
     refreshStatus()
   }, [refreshProjects, refreshStatus])
 
-  useEffect(() => {
-    if (statusTick > 0) refreshStatus()
-  }, [statusTick, refreshStatus])
+  const handleSignOut = async () => {
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
 
   const handleProjectSwitch = (id: string) => router.push(`/projects/${id}`)
 
@@ -81,7 +85,7 @@ export default function AppLayout({ projectId }: Props) {
     }
   }
 
-  const triggerStatusRefresh = () => setStatusTick((t) => t + 1)
+  const triggerStatusRefresh = refreshStatus
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
@@ -98,7 +102,7 @@ export default function AppLayout({ projectId }: Props) {
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Header */}
         <div className="bg-white border-b border-slate-200 px-6 h-14 flex items-center gap-3 shrink-0">
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex-1 flex items-center gap-2 min-w-0">
             <button
               onClick={() => router.push('/projects')}
               className="text-slate-400 hover:text-slate-600 transition-colors text-sm shrink-0"
@@ -116,6 +120,12 @@ export default function AppLayout({ projectId }: Props) {
           {projectStatus?.hasFinalPng && (
             <span className="shrink-0 text-xs px-2.5 py-1 rounded-full bg-green-100 text-green-700 font-medium">완성</span>
           )}
+          <button
+            onClick={handleSignOut}
+            className="ml-auto shrink-0 text-xs text-slate-400 hover:text-slate-600 transition-colors"
+          >
+            로그아웃
+          </button>
         </div>
 
         {/* Tabs */}

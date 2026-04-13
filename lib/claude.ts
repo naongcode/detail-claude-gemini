@@ -180,7 +180,7 @@ ${research.differentiators.map((d) => `- ${d.point}: ${d.explanation}`).join('\n
 반드시 JSON 형식으로만 응답하고, 마크다운 코드블록을 사용하지 마세요.`
 
   const message = await client.messages.create({
-    model: 'claude-opus-4-6',
+    model: process.env.ANTHROPIC_MODEL ?? 'claude-opus-4-6',
     max_tokens: 16000,
     messages: [
       { role: 'user', content: systemPrompt + '\n\n' + userMessage },

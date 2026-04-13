@@ -1,19 +1,23 @@
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { loadProjectData, saveProjectData } from '@/lib/projects'
 import { generateResearch } from '@/lib/openai-pipeline'
 import { generateDetailPage } from '@/lib/claude'
 import { ProductBrief, ResearchOutput, PageDesign } from '@/lib/types'
+import { sse, sseResponse } from '@/lib/sse'
+import { requireAuth, unauthorizedResponse } from '@/lib/auth'
 
 export const maxDuration = 300
-
-function sse(controller: ReadableStreamDefaultController, data: object) {
-  controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(data)}\n\n`))
-}
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  try {
+    await requireAuth()
+  } catch {
+    return unauthorizedResponse()
+  }
+
   const { id: _id } = await params
   const id = decodeURIComponent(_id)
 
@@ -59,11 +63,5 @@ export async function GET(
     },
   })
 
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-    },
-  })
+  return sseResponse(stream)
 }

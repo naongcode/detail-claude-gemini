@@ -1,9 +1,11 @@
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { loadProjectData, getPhotoBuffers } from '@/lib/projects'
 import { uploadSection, downloadSection, uploadFinalPng, getPublicUrl } from '@/lib/supabase'
 import { generateSectionImage } from '@/lib/gemini'
 import { isProductSection } from '@/lib/image-utils'
+import { requireAuth, unauthorizedResponse } from '@/lib/auth'
 import { PageDesign } from '@/lib/types'
+import { sse, sseResponse } from '@/lib/sse'
 
 export const maxDuration = 300
 
@@ -12,14 +14,16 @@ interface SectionRequest {
   note?: string
 }
 
-function sse(controller: ReadableStreamDefaultController, data: object) {
-  controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(data)}\n\n`))
-}
-
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  try {
+    await requireAuth()
+  } catch {
+    return unauthorizedResponse()
+  }
+
   const { id: _id } = await params
   const id = decodeURIComponent(_id)
   const body = await req.json() as { sections: SectionRequest[] }
@@ -88,11 +92,5 @@ export async function POST(
     },
   })
 
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-    },
-  })
+  return sseResponse(stream)
 }

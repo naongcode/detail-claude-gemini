@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateBrief } from '@/lib/openai-pipeline'
 import { saveProjectData } from '@/lib/supabase'
+import { requireAuth, unauthorizedResponse } from '@/lib/auth'
 
 export const maxDuration = 60
 
@@ -11,6 +12,7 @@ export async function POST(
   const { id: _id } = await params
   const id = decodeURIComponent(_id)
   try {
+    await requireAuth()
     const body = await req.json()
     const { description } = body
     if (!description?.trim()) {
@@ -22,6 +24,7 @@ export async function POST(
 
     return NextResponse.json(brief)
   } catch (err) {
+    if (String(err).includes('UNAUTHORIZED')) return unauthorizedResponse()
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { loadProjectData } from '@/lib/projects'
 import { uploadFinalPng, downloadSection, saveProjectData, getPublicUrl } from '@/lib/supabase'
 import { PageDesign } from '@/lib/types'
+import { requireAuth, unauthorizedResponse } from '@/lib/auth'
 
 export const runtime = 'nodejs'
 
@@ -15,6 +16,7 @@ export async function POST(
   const id = decodeURIComponent(_id)
 
   try {
+    await requireAuth()
     const pageDesign = await loadProjectData<PageDesign>(id, 'page_design')
     if (!pageDesign) return NextResponse.json({ error: '페이지 디자인 없음' }, { status: 404 })
 
@@ -40,6 +42,7 @@ export async function POST(
 
     return NextResponse.json({ done: true })
   } catch (err) {
+    if (String(err).includes('UNAUTHORIZED')) return unauthorizedResponse()
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
 }

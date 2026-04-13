@@ -1,7 +1,7 @@
-import { createClient } from '@supabase/supabase-js'
+import { createBrowserClient } from '@supabase/ssr'
 
-// 브라우저 전용 Supabase 클라이언트 (anon key)
-export const supabaseBrowser = createClient(
+// 브라우저 전용 Supabase 클라이언트 (auth 세션 공유)
+export const supabaseBrowser = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )

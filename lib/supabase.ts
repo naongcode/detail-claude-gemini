@@ -36,11 +36,12 @@ export function getPublicUrl(pid: string, type: 'photo' | 'section' | 'final', f
 
 type DataField = 'brief' | 'research' | 'page_design' | 'html_page'
 
-export async function listProjects(): Promise<ProjectMeta[]> {
+export async function listProjects(userId: string): Promise<ProjectMeta[]> {
   const supabase = getClient()
   const { data, error } = await supabase
     .from('projects')
     .select('id, name, created_at, updated_at')
+    .eq('user_id', userId)
     .order('created_at', { ascending: false })
   if (error) throw error
   return (data ?? []).map((r) => ({
@@ -51,12 +52,13 @@ export async function listProjects(): Promise<ProjectMeta[]> {
   }))
 }
 
-export async function createProject(id: string, name: string): Promise<void> {
+export async function createProject(id: string, name: string, userId: string): Promise<void> {
   const supabase = getClient()
   const now = new Date().toISOString()
   const { error } = await supabase.from('projects').insert({
     id,
     name,
+    user_id: userId,
     created_at: now,
     updated_at: now,
   })

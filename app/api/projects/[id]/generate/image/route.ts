@@ -4,6 +4,7 @@ import { uploadSection, listSections } from '@/lib/supabase'
 import { generateSectionImage } from '@/lib/gemini'
 import { isProductSection } from '@/lib/image-utils'
 import { PageDesign } from '@/lib/types'
+import { requireAuth, unauthorizedResponse } from '@/lib/auth'
 
 export const maxDuration = 60
 
@@ -15,6 +16,7 @@ export async function POST(
   const id = decodeURIComponent(_id)
 
   try {
+    await requireAuth()
     const { sectionId } = await req.json() as { sectionId: string }
     if (!sectionId) return NextResponse.json({ error: 'sectionId 필요' }, { status: 400 })
 
@@ -36,6 +38,7 @@ export async function POST(
 
     return NextResponse.json({ done: true, sectionId })
   } catch (err) {
+    if (String(err).includes('UNAUTHORIZED')) return unauthorizedResponse()
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
 }
