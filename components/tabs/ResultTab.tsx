@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { ProjectStatus, PageDesign, ImageRequest } from '@/lib/types'
+import SectionImage from '@/components/ui/SectionImage'
 
 interface Props {
   projectId: string
@@ -247,7 +248,7 @@ function SectionCard({ img, src, checked, note, disabled, onToggle, onNoteChange
     <div className={`bg-white border rounded-2xl overflow-hidden transition-colors shadow-sm ${checked ? 'border-blue-400 ring-1 ring-blue-300' : 'border-slate-200'}`}>
       {/* Thumbnail */}
       <div className="cursor-pointer" onClick={() => !disabled && onToggle()}>
-        <SectionImage src={src} alt={img.id} />
+        <SectionImage src={src} alt={img.id} aspectRatio="2/1" />
       </div>
 
       {/* Label + actions */}
@@ -318,26 +319,3 @@ function FinalImage({ src }: { src: string }) {
   )
 }
 
-function SectionImage({ src, alt }: { src: string; alt: string }) {
-  const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>('loading')
-  return (
-    <div className="relative bg-slate-100" style={{ aspectRatio: '2/1' }}>
-      {status === 'loading' && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-slate-400 text-xs animate-pulse">로딩 중...</div>
-        </div>
-      )}
-      {status === 'error' && (
-        <div className="absolute inset-0 flex items-center justify-center text-slate-300 text-xs">미생성</div>
-      )}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={src}
-        alt={alt}
-        className={`w-full h-full object-cover ${status === 'loaded' ? '' : 'opacity-0'}`}
-        onLoad={() => setStatus('loaded')}
-        onError={() => setStatus('error')}
-      />
-    </div>
-  )
-}

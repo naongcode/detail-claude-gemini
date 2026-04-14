@@ -1,13 +1,15 @@
-/**
- * 미사용 함수 보관용 — 현재 파이프라인에서 제거되었으나 참고용으로 보존.
- * 실제 코드에서 import하지 말 것.
- */
+# Legacy OpenAI Pipeline (미사용)
 
-import OpenAI from 'openai'
-import { ProductBrief, ResearchOutput } from './types'
+현재 파이프라인에서 제거된 함수들. 참고용으로만 보존.
 
-// 아래 타입들은 현재 types.ts에서 제거된 레거시 타입입니다.
+현재 파이프라인은 Claude가 HTML + 이미지 요청을 한 번에 설계하는 방식으로 대체됨.
+이 파일의 함수들은 GPT-4o가 단계별로 디자인 방향 → 레이아웃 → 카피 → 이미지 프롬프트를 각각 생성하던 구 파이프라인.
 
+---
+
+## 레거시 타입
+
+```ts
 interface DesignDirection {
   style_preset: string
   color_palette: Record<string, string> & {
@@ -46,19 +48,15 @@ interface ImagePromptItem {
 }
 
 type ImagePrompts = Record<string, ImagePromptItem>
+```
 
-// ─────────────────────────────────────────────────────────────────────────────
+---
 
-function getClient(): OpenAI {
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) throw new Error('OPENAI_API_KEY가 설정되지 않았습니다.')
-  return new OpenAI({ apiKey })
-}
+## Step 3: generateDesignDirection
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Step 3: generateDesignDirection
-// ─────────────────────────────────────────────────────────────────────────────
+GPT-4o로 비주얼 디자인 방향(컬러, 타이포, 스타일) 결정.
 
+```ts
 export async function generateDesignDirection(
   brief: ProductBrief,
   research: ResearchOutput
@@ -131,11 +129,15 @@ export async function generateDesignDirection(
 
   return JSON.parse(response.choices[0].message.content!) as DesignDirection
 }
+```
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Step 5: generateCopy (layout_spec 기반)
-// ─────────────────────────────────────────────────────────────────────────────
+---
 
+## Step 5: generateCopy
+
+GPT-4o로 레이아웃 스펙 기반 섹션별 카피 생성.
+
+```ts
 export async function generateCopy(
   brief: ProductBrief,
   research: ResearchOutput,
@@ -153,45 +155,13 @@ export async function generateCopy(
     '자연스러운 한국어 구어체로, 감정→논리 흐름에 맞게 각 섹션의 카피를 작성하세요. ' +
     '번역투 금지, 구체적 숫자 사용, 2인칭 활용, 짧은 문장.'
 
-  const userMessage = `
-다음 섹션 목록에 대해 카피를 작성하세요:
-${sectionList}
-
-각 섹션의 id를 key로 사용한 JSON을 반환하세요.
-섹션별 구조 가이드:
-- hero: { headline_options: [3개], subheadline, urgency_badge, cta_text }
-- pain: { intro, pain_points: [3~4개], emotional_hook }
-- problem: { hook, reasons: [3개], reframe }
-- story: { before, turning_point, after, proof }
-- solution / solution_intro: { intro, product_name, one_liner, target_fit }
-- how_it_works: { headline, steps: [{number, title, description, result}] }
-- social_proof: { headline, stats: [3개], testimonials: [{quote, name, result}] }
-- authority: { intro, bio, credentials: [3개], message }
-- benefits: { headline, main_benefits: [4개], bonus_items: [{item, value}], total_value }
-- risk_removal: { guarantee, faq: [{question, answer}], support }
-- comparison: { without: [3개], with: [3개], question }
-- target_filter: { recommended: [3개], not_recommended: [2개] }
-- final_cta: { headline, urgency, price_original, price_discounted, cta_button, closing }
-- curriculum: { headline, modules: [{number, title, lessons, duration}], total_duration }
-- features: { headline, features: [{icon_hint, title, description}] }
-- ingredients: { headline, ingredients: [{name, benefit, amount}], certifications }
-- process: { headline, steps: [{number, title, description, duration}] }
-- case_study: { headline, cases: [{client, problem, result, duration}] }
-- pricing: { headline, plans: [{name, price, features, highlight}] }
-위에 없는 섹션 id는 { heading, body } 형태로 작성하세요.
-
-제품 브리프:
-${JSON.stringify(brief, null, 2)}
-
-리서치:
-${JSON.stringify(research, null, 2)}`
-
+  // 섹션별 구조 가이드 (userMessage 전체는 소스 참고)
   const response = await client.chat.completions.create({
     model: 'gpt-4o',
     response_format: { type: 'json_object' },
     messages: [
       { role: 'system', content: systemPrompt },
-      { role: 'user', content: userMessage },
+      { role: 'user', content: '...' },
     ],
     temperature: 0.8,
     max_tokens: 8000,
@@ -199,11 +169,40 @@ ${JSON.stringify(research, null, 2)}`
 
   return JSON.parse(response.choices[0].message.content!) as CopyOutput
 }
+```
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Step 6: generateImagePrompts (image 섹션만)
-// ─────────────────────────────────────────────────────────────────────────────
+### 섹션 구조 가이드 (generateCopy userMessage)
 
+| 섹션 id | 필드 |
+|---------|------|
+| hero | `headline_options[3]`, `subheadline`, `urgency_badge`, `cta_text` |
+| pain | `intro`, `pain_points[3~4]`, `emotional_hook` |
+| problem | `hook`, `reasons[3]`, `reframe` |
+| story | `before`, `turning_point`, `after`, `proof` |
+| solution / solution_intro | `intro`, `product_name`, `one_liner`, `target_fit` |
+| how_it_works | `headline`, `steps[{number,title,description,result}]` |
+| social_proof | `headline`, `stats[3]`, `testimonials[{quote,name,result}]` |
+| authority | `intro`, `bio`, `credentials[3]`, `message` |
+| benefits | `headline`, `main_benefits[4]`, `bonus_items[{item,value}]`, `total_value` |
+| risk_removal | `guarantee`, `faq[{question,answer}]`, `support` |
+| comparison | `without[3]`, `with[3]`, `question` |
+| target_filter | `recommended[3]`, `not_recommended[2]` |
+| final_cta | `headline`, `urgency`, `price_original`, `price_discounted`, `cta_button`, `closing` |
+| curriculum | `headline`, `modules[{number,title,lessons,duration}]`, `total_duration` |
+| features | `headline`, `features[{icon_hint,title,description}]` |
+| ingredients | `headline`, `ingredients[{name,benefit,amount}]`, `certifications` |
+| process | `headline`, `steps[{number,title,description,duration}]` |
+| case_study | `headline`, `cases[{client,problem,result,duration}]` |
+| pricing | `headline`, `plans[{name,price,features,highlight}]` |
+| 기타 | `{ heading, body }` |
+
+---
+
+## Step 6: generateImagePrompts
+
+레이아웃 스펙의 `type: 'image'` 섹션에 대해 Gemini용 프롬프트 생성.
+
+```ts
 const SECTION_LAYOUT_INSTRUCTIONS: Record<string, string> = {
   hero: 'Full-width hero banner. Large headline centered or left-aligned. CTA button prominent below headline. Urgency badge in top corner.',
   pain: 'Grid of 3-4 pain point cards. Each card has an icon and short text. Empathetic tone.',
@@ -261,40 +260,11 @@ export async function generateImagePrompts(
   const result: ImagePrompts = {}
 
   for (const section of imageSections) {
-    if (section.type !== 'image') continue
-
     const copy = copyOutput[section.id] ?? {}
-    const textLines: string[] = []
-    for (const v of Object.values(copy)) {
-      if (typeof v === 'string' && v.trim()) textLines.push(`- ${v}`)
-      else if (Array.isArray(v)) {
-        for (const item of v) {
-          if (typeof item === 'string') textLines.push(`- ${item}`)
-          else if (typeof item === 'object' && item !== null) {
-            for (const iv of Object.values(item as Record<string, unknown>)) {
-              if (typeof iv === 'string') textLines.push(`  - ${iv}`)
-            }
-          }
-        }
-      }
-    }
-
-    const bgPatternValue =
-      design.section_bg_pattern?.[section.bg_pattern] ??
-      design.color_palette.background
-
-    const prompt = PROMPT_TEMPLATE
-      .replace('{height}', String(section.dimensions.height))
-      .replace('{style_preset}', design.style_preset)
-      .replace('{primary}', design.color_palette.primary)
-      .replace('{accent}', design.color_palette.accent)
-      .replace('{bg}', bgPatternValue)
-      .replace('{layout}', SECTION_LAYOUT_INSTRUCTIONS[section.id] ?? 'Full-width centered layout.')
-      .replace('{text}', textLines.length > 0 ? textLines.join('\n') : '(Korean text for this section)')
-
+    // copy 값을 텍스트 라인으로 변환 후 PROMPT_TEMPLATE에 삽입
     const filename = `${String(section.order).padStart(2, '0')}_${section.id}.png`
     result[section.id] = {
-      prompt,
+      prompt: '...', // PROMPT_TEMPLATE 치환 결과
       width: 1200,
       height: section.dimensions.height,
       filename,
@@ -303,3 +273,4 @@ export async function generateImagePrompts(
 
   return result
 }
+```

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import type { TextBlock } from '@/app/api/projects/[id]/html-text/route'
 import { PageDesign, ImageRequest } from '@/lib/types'
+import SectionImage from '@/components/ui/SectionImage'
 
 interface Props {
   projectId: string
@@ -387,32 +388,3 @@ function TextRow({ block, value, original, onChange, onReset }: TextRowProps) {
   )
 }
 
-function SectionImage({ src, alt }: { src: string | null; alt: string }) {
-  const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>('loading')
-
-  if (!src) return (
-    <div className="min-h-32 flex items-center justify-center bg-slate-50 text-slate-300 text-xs">
-      이미지 없음
-    </div>
-  )
-
-  return (
-    <div className="relative bg-slate-100 w-full">
-      {status === 'loading' && (
-        <div className="min-h-32 flex items-center justify-center">
-          <div className="w-4 h-4 border-2 border-slate-300 border-t-slate-500 rounded-full animate-spin" />
-        </div>
-      )}
-      {status === 'error' && (
-        <div className="min-h-32 flex items-center justify-center text-slate-300 text-xs">미생성</div>
-      )}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={src} alt={alt}
-        className={`w-full h-auto block transition-opacity ${status === 'loaded' ? 'opacity-100' : 'opacity-0'}`}
-        onLoad={() => setStatus('loaded')}
-        onError={() => setStatus('error')}
-      />
-    </div>
-  )
-}
