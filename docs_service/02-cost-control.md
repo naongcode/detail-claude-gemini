@@ -356,6 +356,33 @@ UPSTASH_REDIS_REST_TOKEN=
 
 → Opus 기준이면 마진이 너무 얇다. Sonnet 전환 시 마진 50%+ 확보 가능.
 
+---
+
+### [제안] 실측 원가 기반 가격 개편안 (2026-04-14)
+
+실측 파이프라인 원가 (claude-opus-4-6 기준, 이미지 8개):
+
+| 단계 | 모델 | 비용 |
+|------|------|------|
+| 브리프 + 리서치 | GPT-4o | ≈ $0.06 |
+| HTML 설계 | claude-opus-4-6 ($5/$25 MTok) | ≈ $0.29 |
+| 이미지 × 8 | gemini-3-pro-image-preview | ≈ $1.07 |
+| **합계** | | **≈ $1.42 (≈ ₩2,000)** |
+
+→ 참고: [anthropic-pricing.md](./anthropic-pricing.md)
+
+**제안 판매가 (크레딧 = 프로젝트 1개 실행권):**
+
+| 패키지 | 가격 | 개당 단가 | 할인율 | 원가 대비 마진율 |
+|--------|------|-----------|--------|-----------------|
+| 1개 | ₩20,000 | ₩20,000 | — | 90% |
+| 3개 | ₩50,000 | ₩16,667 | 17% ↓ | 88% |
+| 10개 | ₩150,000 | ₩15,000 | 25% ↓ | 87% |
+
+- 인간 디자이너 상세페이지 단가: ₩200,000 이상 → AI 제품은 속도·가격 메리트로 포지셔닝
+- 전 구간 마진 87% 이상 유지
+- 10개 패키지: ₩150,000 / 15만원 선결제로 현금 흐름 확보
+
 ## 재생성 정책
 
 섹션 재생성 1회 API 비용: Gemini 이미지 1장 = ~$0.04~0.08 ≈ ₩60~110
@@ -401,17 +428,24 @@ export async function POST(req: NextRequest, { params }) {
 ## 체크리스트
 
 - [ ] Claude Sonnet vs Opus 품질 비교 테스트 후 모델 결정
-- [ ] `user_credits`, `credit_transactions` 테이블 생성 (`phone_verified`, `phone_hash` 컬럼 포함)
-- [ ] `deduct_credit`, `verify_phone_and_grant_credit` SQL 함수 작성
-- [ ] 가입 시 자동 크레딧 지급 트리거 제거 (핸드폰 인증 후 지급으로 변경)
-- [ ] `lib/credits.ts` 작성
+- [x] `user_credits`, `credit_transactions` 테이블 생성 (`phone_verified`, `phone_hash` 컬럼 포함)
+- [x] `deduct_credit`, `verify_phone_and_grant_credit` SQL 함수 작성
+- [x] 가입 시 자동 크레딧 지급 트리거 제거 (핸드폰 인증 후 지급으로 변경)
+- [x] `lib/credits.ts` 작성
 - [ ] 카카오 디벨로퍼스에서 앱 생성 + `phone_number` scope 활성화
-- [ ] `app/api/auth/kakao/start/route.ts` 작성
-- [ ] `app/api/auth/kakao/callback/route.ts` 작성
-- [ ] 파이프라인 라우트에 크레딧 체크 적용
-- [ ] `projects` 테이블에 `regen_count`, `regen_limit` 컬럼 추가
-- [ ] 재생성 API에 카운터 체크 + 소진 시 크레딧 차감 적용
-- [ ] Upstash Redis rate limiting 적용
-- [ ] 프론트엔드에 잔여 크레딧 + 재생성 남은 횟수 표시
-- [ ] 인증 유도 배너 (미인증 사용자에게 "인증하면 1크레딧 무료" 노출)
-- [ ] 크레딧 부족 시 결제 유도 모달
+- [x] `app/api/auth/kakao/start/route.ts` 작성
+- [x] `app/api/auth/kakao/callback/route.ts` 작성
+- [x] 파이프라인 라우트에 크레딧 체크 적용
+- [x] `projects` 테이블에 `regen_count`, `regen_limit` 컬럼 추가
+- [x] 재생성 API에 카운터 체크 + 소진 시 크레딧 차감 적용
+- [x] Upstash Redis rate limiting 적용
+- [x] 프론트엔드에 잔여 크레딧 + 재생성 남은 횟수 표시
+- [x] 인증 유도 배너 (미인증 사용자에게 "인증하면 1크레딧 무료" 노출)
+- [x] 크레딧 부족 시 결제 유도 모달
+
+### 추가 구현 (문서 외)
+- [x] 파이프라인 중복 실행 방지 — `pipeline_locked_at` 컬럼 + 10분 타임아웃 (20260414000005_pipeline_lock.sql)
+- [x] 크레딧 중복 차감 방지 — `is_project_charge` unique index로 DB 레벨 원자적 처리 (20260414000004_credit_dedup.sql)
+- [x] 중지 시 현재 단계(GPT/Claude) 완료 후 중지 — `state.cancelled` 플래그 + ReadableStream cancel 콜백
+- [x] 프로젝트 소유권 검증 — 브리프 생성 전 `user_id` 일치 확인
+- [x] 차감 시점 보정 — GPT 성공 후에만 크레딧 차감 (실패 시 차감 없음)

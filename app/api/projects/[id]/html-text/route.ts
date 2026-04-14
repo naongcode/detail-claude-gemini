@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { loadProjectData, saveProjectData, downloadSection, listSections, uploadFinalPng, getPublicUrl } from '@/lib/supabase'
 import { load } from 'cheerio'
 import { PageDesign } from '@/lib/types'
+import { requireAuth, unauthorizedResponse, requireProjectOwner, forbiddenResponse } from '@/lib/auth'
 
 export interface TextBlock {
   eid: string
@@ -161,6 +162,14 @@ export async function GET(
   const { id: _id } = await params
   const id = decodeURIComponent(_id)
 
+  try {
+    const user = await requireAuth()
+    await requireProjectOwner(user.id, id)
+  } catch (err) {
+    if (String(err).includes('UNAUTHORIZED')) return unauthorizedResponse()
+    return forbiddenResponse()
+  }
+
   const html = await loadProjectData<string>(id, 'html_page')
   if (!html) return NextResponse.json({ blocks: [] })
 
@@ -177,6 +186,14 @@ export async function PUT(
 ) {
   const { id: _id } = await params
   const id = decodeURIComponent(_id)
+
+  try {
+    const user = await requireAuth()
+    await requireProjectOwner(user.id, id)
+  } catch (err) {
+    if (String(err).includes('UNAUTHORIZED')) return unauthorizedResponse()
+    return forbiddenResponse()
+  }
 
   const html = await loadProjectData<string>(id, 'html_page')
   if (!html) return NextResponse.json({ error: 'html_page 없음' }, { status: 404 })

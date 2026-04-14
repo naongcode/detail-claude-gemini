@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { loadProjectData, saveProjectData, getProjectRow } from '@/lib/supabase'
 import { downloadSection, listSections, uploadFinalPng, getPublicUrl } from '@/lib/supabase'
 import { PageDesign } from '@/lib/types'
+import { requireAuth, unauthorizedResponse, requireProjectOwner, forbiddenResponse } from '@/lib/auth'
 
 type DataKey = 'research' | 'pageDesign'
 
@@ -14,6 +15,8 @@ export async function GET(
   const key = req.nextUrl.searchParams.get('key') as DataKey | null
 
   try {
+    const user = await requireAuth()
+    await requireProjectOwner(user.id, id)
     if (key === 'research') {
       return NextResponse.json(await loadProjectData(id, 'research'))
     }
@@ -28,6 +31,8 @@ export async function GET(
       pageDesign: row?.page_design ?? null,
     })
   } catch (err) {
+    if (String(err).includes('UNAUTHORIZED')) return unauthorizedResponse()
+    if (String(err).includes('FORBIDDEN')) return forbiddenResponse()
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
 }
@@ -41,6 +46,8 @@ export async function PUT(
   const key = req.nextUrl.searchParams.get('key') as DataKey | null
 
   try {
+    const user = await requireAuth()
+    await requireProjectOwner(user.id, id)
     if (!key || !['research', 'pageDesign'].includes(key)) {
       return NextResponse.json({ error: '유효한 key가 필요합니다 (research|pageDesign)' }, { status: 400 })
     }
@@ -82,6 +89,8 @@ export async function PUT(
 
     return NextResponse.json({ saved: true })
   } catch (err) {
+    if (String(err).includes('UNAUTHORIZED')) return unauthorizedResponse()
+    if (String(err).includes('FORBIDDEN')) return forbiddenResponse()
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
 }

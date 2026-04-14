@@ -30,3 +30,18 @@ export async function requireAuth() {
 export function unauthorizedResponse() {
   return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
 }
+
+export function forbiddenResponse() {
+  return NextResponse.json({ error: '접근 권한이 없습니다.' }, { status: 403 })
+}
+
+export async function requireProjectOwner(userId: string, projectId: string): Promise<void> {
+  const supabase = await createSupabaseServer()
+  const { data } = await supabase
+    .from('projects')
+    .select('id')
+    .eq('id', projectId)
+    .eq('user_id', userId)
+    .single()
+  if (!data) throw new Error('FORBIDDEN')
+}

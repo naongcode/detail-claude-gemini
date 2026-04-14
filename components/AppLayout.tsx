@@ -3,11 +3,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@supabase/ssr'
+import Link from 'next/link'
 import ProjectSidebar from './ProjectSidebar'
 import BriefTab from './tabs/BriefTab'
 import LayoutTab from './tabs/LayoutTab'
 import TextEditTab from './tabs/TextEditTab'
 import ResultTab from './tabs/ResultTab'
+import CreditModal from './ui/CreditModal'
 import { ProjectMeta, ProjectStatus } from '@/lib/types'
 
 interface Props {
@@ -29,6 +31,8 @@ export default function AppLayout({ projectId }: Props) {
   const [projects, setProjects] = useState<ProjectMeta[]>([])
   const [projectStatus, setProjectStatus] = useState<ProjectStatus | null>(null)
   const [creditBalance, setCreditBalance] = useState<number | null>(null)
+  const [phoneVerified, setPhoneVerified] = useState<boolean>(true) // 기본 true로 배너 깜빡임 방지
+  const [showCreditModal, setShowCreditModal] = useState(false)
 
   const refreshProjects = useCallback(async () => {
     const res = await fetch('/api/projects')
@@ -51,6 +55,7 @@ export default function AppLayout({ projectId }: Props) {
     if (res.ok) {
       const data = await res.json()
       setCreditBalance(data.balance)
+      setPhoneVerified(data.phone_verified)
     }
   }, [])
 
@@ -103,6 +108,7 @@ export default function AppLayout({ projectId }: Props) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
+      {showCreditModal && <CreditModal onClose={() => setShowCreditModal(false)} />}
       <ProjectSidebar
         projects={projects}
         activeProjectId={projectId}
@@ -136,10 +142,29 @@ export default function AppLayout({ projectId }: Props) {
           )}
           <div className="ml-auto flex items-center gap-3 shrink-0">
             {creditBalance !== null && (
-              <span className="text-xs font-medium text-slate-600 bg-slate-100 px-2.5 py-1 rounded-full">
-                크레딧 {creditBalance}개
-              </span>
+              <div className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border font-medium ${
+                creditBalance === 0
+                  ? 'bg-red-50 border-red-200 text-red-700'
+                  : 'bg-slate-100 border-slate-200 text-slate-700'
+              }`}>
+                <span>크레딧</span>
+                <span className="font-bold">{creditBalance}</span>
+                {creditBalance === 0 && (
+                  <button
+                    onClick={() => setShowCreditModal(true)}
+                    className="ml-1 text-red-600 underline hover:text-red-800 transition-colors"
+                  >
+                    충전
+                  </button>
+                )}
+              </div>
             )}
+            <Link
+              href="/purchase"
+              className="text-xs text-blue-600 font-semibold hover:text-blue-700 border border-blue-200 bg-blue-50 px-2.5 py-1 rounded-lg transition-colors"
+            >
+              충전
+            </Link>
             <button
               onClick={handleSignOut}
               className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
@@ -148,6 +173,21 @@ export default function AppLayout({ projectId }: Props) {
             </button>
           </div>
         </div>
+
+        {/* 인증 유도 배너 */}
+        {!phoneVerified && (
+          <div className="bg-amber-50 border-b border-amber-200 px-6 py-2.5 flex items-center justify-between gap-4 shrink-0">
+            <p className="text-sm text-amber-800">
+              핸드폰 인증 시 <span className="font-semibold">크레딧 1개를 무료</span>로 드립니다.
+            </p>
+            <a
+              href="/api/auth/kakao/start"
+              className="shrink-0 bg-amber-400 hover:bg-amber-500 text-amber-900 text-xs font-semibold px-4 py-1.5 rounded-lg transition-colors"
+            >
+              카카오로 인증하기
+            </a>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="bg-white border-b border-slate-200 px-6 shrink-0">

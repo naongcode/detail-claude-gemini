@@ -198,3 +198,6 @@ npm run dev    # next dev (Turbopack)
 npm run build
 npm run start
 ```
+
+supabase 마이그레이션 파일은 다음 형식을 따를것 - 20260414000001_schema.sql
+마이그레이션 파일은 수정하지말고 새로 생성할것.

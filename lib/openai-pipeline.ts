@@ -1,5 +1,6 @@
 import OpenAI from 'openai'
 import { ProductBrief, ResearchOutput } from './types'
+import { trackCost } from './cost-tracker'
 
 
 function getClient(): OpenAI {
@@ -12,7 +13,10 @@ function getClient(): OpenAI {
 // Step 1: generateBrief
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function generateBrief(productDescription: string): Promise<ProductBrief> {
+export async function generateBrief(
+  productDescription: string,
+  tracking?: { userId: string; projectId: string }
+): Promise<ProductBrief> {
   const client = getClient()
 
   const systemPrompt =
@@ -73,6 +77,17 @@ extra_fields 작성 규칙:
     temperature: 0.8,
   })
 
+  if (tracking && response.usage) {
+    await trackCost({
+      userId: tracking.userId,
+      projectId: tracking.projectId,
+      provider: 'openai',
+      operation: 'brief',
+      inputTokens: response.usage.prompt_tokens,
+      outputTokens: response.usage.completion_tokens,
+    })
+  }
+
   return JSON.parse(response.choices[0].message.content!) as ProductBrief
 }
 
@@ -80,7 +95,10 @@ extra_fields 작성 규칙:
 // Step 2: generateResearch
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function generateResearch(brief: ProductBrief): Promise<ResearchOutput> {
+export async function generateResearch(
+  brief: ProductBrief,
+  tracking?: { userId: string; projectId: string }
+): Promise<ResearchOutput> {
   const client = getClient()
 
   const systemPrompt =
@@ -125,6 +143,17 @@ export async function generateResearch(brief: ProductBrief): Promise<ResearchOut
     ],
     temperature: 0.7,
   })
+
+  if (tracking && response.usage) {
+    await trackCost({
+      userId: tracking.userId,
+      projectId: tracking.projectId,
+      provider: 'openai',
+      operation: 'research',
+      inputTokens: response.usage.prompt_tokens,
+      outputTokens: response.usage.completion_tokens,
+    })
+  }
 
   return JSON.parse(response.choices[0].message.content!) as ResearchOutput
 }

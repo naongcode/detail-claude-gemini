@@ -12,6 +12,12 @@ interface Props {
 
 interface LogEntry { message: string; isError: boolean }
 
+interface VersionItem {
+  id: number
+  version: number
+  created_at: string
+}
+
 export default function ResultTab({ projectId, projectName, projectStatus, onStatusChange }: Props) {
   const [imgTimestamp, setImgTimestamp] = useState(Date.now())
   const [pageDesign, setPageDesign] = useState<PageDesign | null>(null)
@@ -19,12 +25,20 @@ export default function ResultTab({ projectId, projectName, projectStatus, onSta
   const [notes, setNotes] = useState<Record<string, string>>({})
   const [regenerating, setRegenerating] = useState(false)
   const [logs, setLogs] = useState<LogEntry[]>([])
+  const [versions, setVersions] = useState<VersionItem[]>([])
 
   useEffect(() => {
     fetch(`/api/projects/${projectId}/data/layout`)
       .then((r) => r.ok ? r.json() : null)
       .then((data) => setPageDesign(data))
   }, [projectId, projectStatus?.imageGenerated])
+
+  useEffect(() => {
+    fetch(`/api/projects/${projectId}/versions`)
+      .then((r) => r.ok ? r.json() : [])
+      .then((data) => setVersions(Array.isArray(data) ? data : []))
+      .catch(() => {})
+  }, [projectId, projectStatus?.hasFinalPng])
 
   useEffect(() => {
     setImgTimestamp(Date.now())
@@ -193,6 +207,22 @@ export default function ResultTab({ projectId, projectName, projectStatus, onSta
                   a.click()
                 }}
               />
+            ))}
+          </div>
+        </div>
+      )}
+      {/* 버전 히스토리 */}
+      {versions.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold text-slate-700">🕒 생성 히스토리</h3>
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm divide-y divide-slate-100">
+            {versions.map((v) => (
+              <div key={v.id} className="flex items-center gap-3 px-4 py-3">
+                <span className="text-xs font-bold text-slate-500 w-8">v{v.version}</span>
+                <span className="text-xs text-slate-500">
+                  {new Date(v.created_at).toLocaleString('ko-KR')}
+                </span>
+              </div>
             ))}
           </div>
         </div>

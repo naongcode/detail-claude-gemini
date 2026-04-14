@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { ProductBrief, ProjectStatus } from '@/lib/types'
 import PhotoUpload from './PhotoUpload'
 import PipelineRunner from './PipelineRunner'
+import CreditModal from '@/components/ui/CreditModal'
 
 interface Props {
   projectId: string
@@ -53,6 +54,9 @@ export default function BriefTab({ projectId, projectStatus, onStatusChange, onT
   const [brief, setBrief] = useState<ProductBrief>(EMPTY_BRIEF)
   const [description, setDescription] = useState('')
   const [autoFilling, setAutoFilling] = useState(false)
+  const [autoFillError, setAutoFillError] = useState('')
+  const [creditMsg, setCreditMsg] = useState('')
+  const [showCreditModal, setShowCreditModal] = useState(false)
   const [saving, setSaving] = useState(false)
   const [savedMsg, setSavedMsg] = useState('')
 
@@ -70,7 +74,10 @@ export default function BriefTab({ projectId, projectStatus, onStatusChange, onT
 
   const handleAutoFill = async () => {
     if (!description.trim()) return
+    if (!window.confirm('크레딧 1개가 차감됩니다. 계속하시겠습니까?\n(같은 프로젝트는 재실행 시 차감되지 않습니다)')) return
     setAutoFilling(true)
+    setAutoFillError('')
+    setCreditMsg('')
     try {
       const res = await fetch(`/api/projects/${projectId}/generate/brief`, {
         method: 'POST',
@@ -78,17 +85,28 @@ export default function BriefTab({ projectId, projectStatus, onStatusChange, onT
         body: JSON.stringify({ description }),
       })
       if (res.ok) {
-        const data = await res.json()
+        const { brief: data, deducted, balance } = await res.json()
         const withRaw = {
           ...data,
           testimonials_raw: Array.isArray(data.testimonials) ? data.testimonials.join('\n') : (data.testimonials_raw ?? ''),
           bonus_items_raw: Array.isArray(data.bonus_items) ? data.bonus_items.join('\n') : (data.bonus_items_raw ?? ''),
         }
         setBrief({ ...EMPTY_BRIEF, ...withRaw })
+        if (deducted) {
+          setCreditMsg(`크레딧 1개 차감됨 (잔여 ${balance}개)`)
+        }
         onStatusChange()
+        setTimeout(() => setCreditMsg(''), 4000)
+      } else if (res.status === 402) {
+        setShowCreditModal(true)
+      } else if (res.status === 429) {
+        const err = await res.json()
+        setAutoFillError(err.error)
+      } else {
+        const err = await res.json()
+        setAutoFillError(`오류: ${err.error}`)
       }
-      else { const err = await res.json(); alert(`오류: ${err.error}`) }
-    } catch (e) { alert(`오류: ${String(e)}`) }
+    } catch (e) { setAutoFillError(`오류: ${String(e)}`) }
     finally { setAutoFilling(false) }
   }
 
@@ -112,6 +130,7 @@ export default function BriefTab({ projectId, projectStatus, onStatusChange, onT
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-5">
+      {showCreditModal && <CreditModal onClose={() => setShowCreditModal(false)} />}
 
       {/* Section: 제품사진 */}
       <PhotoUpload projectId={projectId} onStatusChange={onStatusChange} />
@@ -126,13 +145,17 @@ export default function BriefTab({ projectId, projectStatus, onStatusChange, onT
           className="w-full mt-4 border border-blue-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
           rows={3}
         />
-        <button
-          onClick={handleAutoFill}
-          disabled={autoFilling || !description.trim()}
-          className="mt-3 bg-blue-600 text-white text-sm px-5 py-2.5 rounded-xl hover:bg-blue-700 disabled:opacity-40 transition-colors font-semibold"
-        >
-          {autoFilling ? '🤖 AI 분석 중...' : '🤖 AI로 자동 채우기'}
-        </button>
+        <div className="mt-3 flex items-center gap-3">
+          <button
+            onClick={handleAutoFill}
+            disabled={autoFilling || !description.trim()}
+            className="bg-blue-600 text-white text-sm px-5 py-2.5 rounded-xl hover:bg-blue-700 disabled:opacity-40 transition-colors font-semibold shrink-0"
+          >
+            {autoFilling ? 'AI 분석 중...' : 'AI로 자동 채우기'}
+          </button>
+          {creditMsg && <p className="text-sm text-green-600 font-medium">{creditMsg}</p>}
+          {autoFillError && <p className="text-sm text-red-600 font-medium">{autoFillError}</p>}
+        </div>
       </Card>
 
       {/* Section: 제품 정보 폼 */}

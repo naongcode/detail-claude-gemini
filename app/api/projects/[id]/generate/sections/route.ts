@@ -3,7 +3,8 @@ import { loadProjectData, getPhotoBuffers } from '@/lib/projects'
 import { uploadSection, downloadSection, uploadFinalPng, getPublicUrl } from '@/lib/supabase'
 import { generateSectionImage } from '@/lib/gemini'
 import { isProductSection } from '@/lib/image-utils'
-import { requireAuth, unauthorizedResponse } from '@/lib/auth'
+import { requireAuth, unauthorizedResponse, requireProjectOwner, forbiddenResponse } from '@/lib/auth'
+import { checkAndChargeRegen } from '@/lib/credits'
 import { PageDesign } from '@/lib/types'
 import { sse, sseResponse } from '@/lib/sse'
 
@@ -18,16 +19,29 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
-    await requireAuth()
-  } catch {
-    return unauthorizedResponse()
-  }
-
   const { id: _id } = await params
   const id = decodeURIComponent(_id)
+
+  let user
+  try {
+    user = await requireAuth()
+    await requireProjectOwner(user.id, id)
+  } catch (err) {
+    if (String(err).includes('UNAUTHORIZED')) return unauthorizedResponse()
+    return forbiddenResponse()
+  }
+
   const body = await req.json() as { sections: SectionRequest[] }
   const sectionRequests: SectionRequest[] = body.sections ?? []
+
+  // 재생성 티켓 확인 및 차감 (스트림 시작 전)
+  let regenSource: 'free' | 'purchased'
+  try {
+    const result = await checkAndChargeRegen(user.id, id)
+    regenSource = result.source
+  } catch (err) {
+    return NextResponse.json({ error: String(err) }, { status: 402 })
+  }
 
   const stream = new ReadableStream({
     async start(controller) {

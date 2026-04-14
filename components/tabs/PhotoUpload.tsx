@@ -24,8 +24,18 @@ export default function PhotoUpload({ projectId, onStatusChange }: Props) {
     if (!files || files.length === 0) return
     setPhotoSaving(true)
     try {
-      const { uploadPhotoFromBrowser } = await import('@/lib/supabase-browser')
-      await Promise.all(Array.from(files).map((file) => uploadPhotoFromBrowser(projectId, file)))
+      await Promise.all(Array.from(files).map(async (file) => {
+        const formData = new FormData()
+        formData.append('file', file)
+        const res = await fetch(`/api/projects/${projectId}/photos`, {
+          method: 'POST',
+          body: formData,
+        })
+        if (!res.ok) {
+          const err = await res.json()
+          throw new Error(err.error ?? '업로드 실패')
+        }
+      }))
       await fetchPhotos()
       onStatusChange()
     } catch (e) {

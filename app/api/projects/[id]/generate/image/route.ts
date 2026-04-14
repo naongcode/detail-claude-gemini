@@ -4,7 +4,8 @@ import { uploadSection, listSections } from '@/lib/supabase'
 import { generateSectionImage } from '@/lib/gemini'
 import { isProductSection } from '@/lib/image-utils'
 import { PageDesign } from '@/lib/types'
-import { requireAuth, unauthorizedResponse } from '@/lib/auth'
+import { requireAuth, unauthorizedResponse, requireProjectOwner, forbiddenResponse } from '@/lib/auth'
+import { trackCost } from '@/lib/cost-tracker'
 
 export const maxDuration = 60
 
@@ -16,7 +17,8 @@ export async function POST(
   const id = decodeURIComponent(_id)
 
   try {
-    await requireAuth()
+    const user = await requireAuth()
+    await requireProjectOwner(user.id, id)
     const { sectionId } = await req.json() as { sectionId: string }
     if (!sectionId) return NextResponse.json({ error: 'sectionId 필요' }, { status: 400 })
 
@@ -36,9 +38,18 @@ export async function POST(
     const buffer = await generateSectionImage(imgReq.prompt, imgReq.width, imgReq.height, photoBuffers)
     await uploadSection(id, imgReq.id, buffer)
 
+    await trackCost({
+      userId: user.id,
+      projectId: id,
+      provider: 'gemini',
+      operation: 'image',
+      imageCount: 1,
+    })
+
     return NextResponse.json({ done: true, sectionId })
   } catch (err) {
     if (String(err).includes('UNAUTHORIZED')) return unauthorizedResponse()
+    if (String(err).includes('FORBIDDEN')) return forbiddenResponse()
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
 }

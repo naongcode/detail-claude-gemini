@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { ProjectStatus, PipelineEvent, ImageRequest } from '@/lib/types'
 import ProgressLog, { LogEntry } from '@/components/ui/ProgressLog'
+import CreditModal from '@/components/ui/CreditModal'
 
 interface Props {
   projectId: string
@@ -11,69 +12,121 @@ interface Props {
   onTabChange: (tab: string) => void
 }
 
-const PIPELINE_STEPS = [
-  { key: 'hasResearch',   label: '리서치' },
-  { key: 'hasPageDesign', label: '페이지 설계' },
-  { key: 'imagesDone',    label: '이미지 생성' },
-  { key: 'hasFinalPng',   label: '최종 렌더' },
-] as const
+interface LastError {
+  stage: string
+  message: string
+}
+
+function estimatedMinutes(imageCount: number) {
+  const totalSec = imageCount * 25 + 120 // 이미지당 25초 + 리서치/설계 2분
+  return Math.ceil(totalSec / 60)
+}
 
 export default function PipelineRunner({ projectId, projectStatus, onStatusChange, onTabChange }: Props) {
   const [running, setRunning] = useState(false)
   const [logs, setLogs] = useState<LogEntry[]>([])
-  const esRef = useRef<EventSource | null>(null)
+  const [showCreditModal, setShowCreditModal] = useState(false)
+  const [lastError, setLastError] = useState<LastError | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
+
+  // 마운트 시 이전 실패 상태 로드
+  useEffect(() => {
+    fetch(`/api/projects/${projectId}/pipeline-status`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data?.error && data?.stage === 'failed') {
+          setLastError({ stage: data.stage, message: data.error })
+        }
+      })
+      .catch(() => {})
+  }, [projectId])
 
   const addLog = (message: string, type: LogEntry['type']) =>
     setLogs((prev) => [...prev, { message, type, timestamp: new Date() }])
 
-  const handleRun = () => {
+  const handleRun = async () => {
     if (running) return
     setLogs([])
+    setLastError(null)
     setRunning(true)
-    let finished = false
 
-    const es = new EventSource(`/api/projects/${projectId}/generate/pipeline`)
-    esRef.current = es
+    const abort = new AbortController()
+    abortRef.current = abort
 
-    es.onmessage = (event) => {
-      try {
-        const data: PipelineEvent = JSON.parse(event.data)
-        if (data.type === 'step_done') return
+    try {
+      const res = await fetch(`/api/projects/${projectId}/generate/pipeline`, { signal: abort.signal })
 
-        const type: LogEntry['type'] =
-          data.type === 'error'        ? 'error'   :
-          data.type === 'done'         ? 'success' :
-          data.type === 'design_ready' ? 'success' :
-          data.type === 'step'         ? 'step'    : 'info'
-
-        const message =
-          data.type === 'error'        ? `오류: ${data.message}` :
-          data.type === 'done'         ? `✓ ${data.message}`     :
-          data.type === 'design_ready' ? `✓ ${data.message}`     :
-          `[${data.step}] ${data.message}`
-
-        addLog(message, type)
-
-        if (data.type === 'design_ready' && data.images) {
-          finished = true
-          es.close()
-          runImageGeneration(data.images)
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: `서버 오류 (${res.status})` }))
+        if (res.status === 402) {
+          setShowCreditModal(true)
+        } else {
+          addLog(err.error ?? `오류 (${res.status})`, res.status === 409 || res.status === 429 ? 'info' : 'error')
         }
-        if (data.type === 'error') {
-          finished = true
-          es.close()
-          setRunning(false)
-          onStatusChange()
-        }
-      } catch { /* ignore parse errors */ }
-    }
-
-    es.onerror = () => {
-      if (!finished) {
-        addLog('SSE 연결 오류', 'error')
         setRunning(false)
+        return
       }
-      es.close()
+
+      const reader = res.body!.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let finished = false
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          try {
+            const data: PipelineEvent = JSON.parse(line.slice(6))
+            if (data.type === 'step_done') continue
+
+            const type: LogEntry['type'] =
+              data.type === 'error'        ? 'error'   :
+              data.type === 'done'         ? 'success' :
+              data.type === 'design_ready' ? 'success' :
+              data.type === 'step'         ? 'step'    : 'info'
+
+            const message =
+              data.type === 'error'        ? `오류: ${data.message}` :
+              data.type === 'done'         ? `✓ ${data.message}`     :
+              data.type === 'design_ready' ? `✓ ${data.message}`     :
+              `[${data.step}] ${data.message}`
+
+            addLog(message, type)
+
+            if (data.type === 'design_ready' && data.images) {
+              finished = true
+              reader.cancel()
+              runImageGeneration(data.images)
+              return
+            }
+            if (data.type === 'error') {
+              finished = true
+              reader.cancel()
+              setLastError({ stage: 'pipeline', message: data.message ?? '알 수 없는 오류' })
+              setRunning(false)
+              onStatusChange()
+              return
+            }
+          } catch { /* ignore parse errors */ }
+        }
+      }
+
+      if (!finished) setRunning(false)
+    } catch (e) {
+      if ((e as Error).name === 'AbortError') {
+        addLog('중지됨', 'info')
+      } else {
+        addLog(`연결 오류: ${String(e)}`, 'error')
+        setLastError({ stage: 'connection', message: String(e) })
+      }
+      setRunning(false)
     }
   }
 
@@ -95,6 +148,7 @@ export default function PipelineRunner({ projectId, projectStatus, onStatusChang
         onStatusChange()
       } catch (err) {
         addLog(`오류: ${String(err)}`, 'error')
+        setLastError({ stage: `이미지 생성 (${sectionId})`, message: String(err) })
         setRunning(false)
         return
       }
@@ -108,16 +162,18 @@ export default function PipelineRunner({ projectId, projectStatus, onStatusChang
         throw new Error(err.error ?? '렌더링 실패')
       }
       addLog('✓ 상세페이지 생성 완료!', 'success')
+      setLastError(null)
       onStatusChange()
       onTabChange('result')
     } catch (err) {
       addLog(`렌더링 오류: ${String(err)}`, 'error')
+      setLastError({ stage: '렌더링', message: String(err) })
     } finally {
       setRunning(false)
     }
   }
 
-  const handleStop = () => { esRef.current?.close(); setRunning(false) }
+  const handleStop = () => { abortRef.current?.abort(); setRunning(false) }
 
   const steps = [
     { label: '리서치',     done: projectStatus?.hasResearch ?? false },
@@ -126,14 +182,23 @@ export default function PipelineRunner({ projectId, projectStatus, onStatusChang
     { label: '최종 렌더',   done: projectStatus?.hasFinalPng ?? false },
   ]
 
+  const imageCount = projectStatus?.imageTotal ?? 6 // 기본 6개 예상
+  const estMin = estimatedMinutes(imageCount)
+
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+      {showCreditModal && <CreditModal onClose={() => setShowCreditModal(false)} />}
       <div className="flex items-start justify-between gap-4">
         <div>
           <h3 className="font-semibold text-slate-800 flex items-center gap-2">
             <span>🚀</span>AI 파이프라인 실행
           </h3>
           <p className="text-xs text-slate-500 mt-0.5">리서치 → 카피 → 디자인 → 이미지 프롬프트 → 섹션 이미지 → 최종 렌더</p>
+          {!running && !projectStatus?.hasFinalPng && (
+            <p className="text-xs text-slate-400 mt-1.5">
+              예상 소요: 이미지 {imageCount}개 기준 약 <span className="font-medium text-slate-500">{estMin}분</span>
+            </p>
+          )}
         </div>
         <div className="shrink-0">
           {running ? (
@@ -146,7 +211,7 @@ export default function PipelineRunner({ projectId, projectStatus, onStatusChang
               disabled={!projectStatus?.hasBrief}
               className="bg-green-600 text-white text-sm px-5 py-2.5 rounded-xl hover:bg-green-700 disabled:opacity-40 transition-colors font-semibold"
             >
-              ▶ 실행
+              {projectStatus?.hasFinalPng ? '▶ 재실행' : '▶ 실행'}
             </button>
           )}
         </div>
@@ -155,6 +220,21 @@ export default function PipelineRunner({ projectId, projectStatus, onStatusChang
       {!projectStatus?.hasBrief && (
         <div className="mt-4 flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
           <span>⚠️</span> 제품 정보를 먼저 저장하세요.
+        </div>
+      )}
+
+      {/* 실패 복구 UI */}
+      {lastError && !running && (
+        <div className="mt-4 bg-red-50 border border-red-200 rounded-xl p-4">
+          <p className="text-sm font-medium text-red-700">{lastError.stage}에서 오류 발생</p>
+          <p className="text-xs text-red-500 mt-1 line-clamp-2">{lastError.message}</p>
+          <p className="text-xs text-red-400 mt-1">이미 완료된 단계는 건너뛰고 이어서 실행합니다.</p>
+          <button
+            onClick={handleRun}
+            className="mt-3 text-sm bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors font-medium"
+          >
+            이어서 재시작
+          </button>
         </div>
       )}
 

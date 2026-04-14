@@ -165,10 +165,10 @@ export async function GET(req: NextRequest) {
 - [ ] 토스페이먼츠 개발자센터 회원가입
 - [ ] 애플리케이션 생성 → 클라이언트 키 / 시크릿 키 발급
 - [ ] 사업자 등록 후 실서비스 심사 신청
-- [ ] `npm install @tosspayments/tosspayments-sdk`
+- [x] `npm install @tosspayments/tosspayments-sdk`
 - [ ] `NEXT_PUBLIC_TOSS_CLIENT_KEY`, `TOSS_SECRET_KEY` 환경변수 설정
-- [ ] `components/CreditPurchaseModal.tsx` 작성
-- [ ] `app/api/payment/success/route.ts` 작성
-- [ ] `lib/credits.ts`에 `addCredits()` 추가
-- [ ] 결제 성공/실패 토스트 메시지 처리
+- [x] `components/ui/CreditModal.tsx` — 결제 키 있으면 실결제, 없으면 "준비 중" 표시
+- [x] `app/api/payment/success/route.ts` 작성
+- [x] `lib/credits.ts`에 `addCredits()` 추가
+- [x] 결제 성공/실패 토스트 메시지 처리
 - [ ] 테스트 결제 시나리오 검증 (성공/실패/취소)

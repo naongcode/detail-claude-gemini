@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { ProductBrief, ResearchOutput, PageDesign } from './types'
+import { trackCost } from './cost-tracker'
 
 function getClient(): Anthropic {
   const apiKey = process.env.ANTHROPIC_API_KEY
@@ -14,7 +15,8 @@ function getClient(): Anthropic {
 
 export async function generateDetailPage(
   brief: ProductBrief,
-  research: ResearchOutput
+  research: ResearchOutput,
+  tracking?: { userId: string; projectId: string }
 ): Promise<PageDesign> {
   const client = getClient()
 
@@ -186,6 +188,17 @@ ${research.differentiators.map((d) => `- ${d.point}: ${d.explanation}`).join('\n
       { role: 'user', content: systemPrompt + '\n\n' + userMessage },
     ],
   })
+
+  if (tracking) {
+    await trackCost({
+      userId: tracking.userId,
+      projectId: tracking.projectId,
+      provider: 'anthropic',
+      operation: 'page_design',
+      inputTokens: message.usage.input_tokens,
+      outputTokens: message.usage.output_tokens,
+    })
+  }
 
   const content = message.content[0]
   if (content.type !== 'text') throw new Error('Claude 응답이 텍스트가 아닙니다.')

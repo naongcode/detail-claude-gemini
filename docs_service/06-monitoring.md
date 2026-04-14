@@ -208,11 +208,11 @@ await alertSlack(`파이프라인 실패 급증: ${failCount}회/시간`, 'error
 
 ## 체크리스트
 
-- [ ] Sentry 설치 및 DSN 설정
-- [ ] 파이프라인 각 단계에 Sentry 스팬/에러 추가
-- [ ] `api_cost_log` 테이블 생성
-- [ ] `lib/cost-tracker.ts` 작성 및 각 AI 호출에 적용
-- [ ] PostHog 설치 및 핵심 이벤트 추적
-- [ ] Vercel Analytics + Speed Insights 활성화
-- [ ] Slack 알림 웹훅 설정
-- [ ] Supabase Dashboard에서 월간 비용 집계 뷰 생성
+- [x] Sentry 설치 및 DSN 설정 (환경변수 입력 필요: NEXT_PUBLIC_SENTRY_DSN 등)
+- [ ] 파이프라인 각 단계에 Sentry 스팬/에러 추가 (기본 에러 캐치는 자동)
+- [x] `api_cost_log` 테이블 생성 (20260414000008 마이그레이션)
+- [x] `lib/cost-tracker.ts` 작성 및 각 AI 호출에 적용 (brief/research/page_design/image)
+- [ ] PostHog — 보류
+- [x] Vercel Analytics + Speed Insights 활성화 (app/layout.tsx)
+- [x] 알림 연동 — Discord (Sentry 통합)
+- [x] API 비용 관리자 페이지에서 확인 (/admin/costs)

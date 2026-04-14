@@ -42,6 +42,7 @@ export async function listProjects(userId: string): Promise<ProjectMeta[]> {
     .from('projects')
     .select('id, name, created_at, updated_at')
     .eq('user_id', userId)
+    .is('deleted_at', null)
     .order('created_at', { ascending: false })
   if (error) throw error
   return (data ?? []).map((r) => ({
@@ -77,7 +78,7 @@ export async function renameProject(pid: string, name: string): Promise<void> {
 export async function deleteProject(pid: string): Promise<void> {
   const supabase = getClient()
 
-  // Storage 파일 전체 삭제
+  // Storage 파일만 삭제 (사진·섹션·최종 PNG)
   const key = toStorageKey(pid)
   for (const folder of ['photos', 'sections']) {
     const { data: sub } = await supabase.storage.from(BUCKET).list(`${key}/${folder}`, { limit: 1000 })
@@ -87,8 +88,11 @@ export async function deleteProject(pid: string): Promise<void> {
   }
   await supabase.storage.from(BUCKET).remove([`${key}/final.png`])
 
-  // DB 행 삭제
-  const { error } = await supabase.from('projects').delete().eq('id', pid)
+  // Soft delete: DB 행은 유지, deleted_at만 기록
+  const { error } = await supabase
+    .from('projects')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', pid)
   if (error) throw error
 }
 
@@ -254,6 +258,67 @@ export async function downloadFinalPng(pid: string): Promise<Buffer | null> {
   const { data, error } = await supabase.storage.from(BUCKET).download(storagePath(pid, 'final'))
   if (error || !data) return null
   return Buffer.from(await data.arrayBuffer())
+}
+
+// ── DB: pipeline_status ───────────────────────────────────────────────────────
+
+export interface PipelineStatus {
+  stage: string
+  completed: string[]   // 완료된 섹션 id 목록 (이미지 생성 단계)
+  failed?: string       // 실패한 섹션 id
+  error?: string
+}
+
+export async function savePipelineStatus(pid: string, status: PipelineStatus | null): Promise<void> {
+  const supabase = getClient()
+  await supabase.from('projects').update({ pipeline_status: status }).eq('id', pid)
+}
+
+export async function loadPipelineStatus(pid: string): Promise<PipelineStatus | null> {
+  const supabase = getClient()
+  const { data } = await supabase.from('projects').select('pipeline_status').eq('id', pid).single()
+  return (data as { pipeline_status: PipelineStatus | null } | null)?.pipeline_status ?? null
+}
+
+// ── DB: project_versions ──────────────────────────────────────────────────────
+
+export interface ProjectVersion {
+  id: number
+  project_id: string
+  version: number
+  page_design: PageDesign | null
+  final_png_path: string | null
+  created_at: string
+}
+
+export async function saveProjectVersion(pid: string, pageDesign: PageDesign, finalPngPath: string): Promise<number> {
+  const supabase = getClient()
+  // 현재 최대 버전 조회
+  const { data: rows } = await supabase
+    .from('project_versions')
+    .select('version')
+    .eq('project_id', pid)
+    .order('version', { ascending: false })
+    .limit(1)
+  const nextVersion = rows && rows.length > 0 ? (rows[0] as { version: number }).version + 1 : 1
+  await supabase.from('project_versions').insert({
+    project_id: pid,
+    version: nextVersion,
+    page_design: pageDesign,
+    final_png_path: finalPngPath,
+  })
+  return nextVersion
+}
+
+export async function listProjectVersions(pid: string): Promise<ProjectVersion[]> {
+  const supabase = getClient()
+  const { data, error } = await supabase
+    .from('project_versions')
+    .select('id, project_id, version, final_png_path, created_at')
+    .eq('project_id', pid)
+    .order('version', { ascending: false })
+  if (error || !data) return []
+  return data as ProjectVersion[]
 }
 
 export async function hasFinalPng(pid: string): Promise<boolean> {

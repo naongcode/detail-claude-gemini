@@ -144,10 +144,10 @@ const nextConfig = {
 
 ## 체크리스트
 
-- [ ] 파일 업로드 API에 크기·MIME·sharp 검증 추가
-- [ ] 모든 `[id]` 라우트에 프로젝트 소유자 확인 추가
-- [ ] 빌드 번들에 서버 API 키 노출 여부 검사
-- [ ] Supabase Storage 버킷 정책 검토
-- [ ] CORS 설정 추가
+- [x] 파일 업로드 API에 크기·MIME·sharp 검증 추가
+- [x] 모든 `[id]` 라우트에 프로젝트 소유자 확인 추가
+- [x] 빌드 번들에 서버 API 키 노출 여부 검사 (NO MATCHES)
+- [x] Supabase Storage 버킷 정책 검토 (20260414000003_storage_auth_policy.sql, 20260414000007)
+- [x] CORS 설정 추가 (next.config.ts, NEXT_PUBLIC_SITE_URL)
 - [ ] iframe 미리보기 추가 시 sandbox 속성 적용
-- [ ] 정기적인 의존성 취약점 스캔 (`npm audit`)
+- [x] 정기적인 의존성 취약점 스캔 (`npm audit`) — next@16.2.3, 0 high vulns
