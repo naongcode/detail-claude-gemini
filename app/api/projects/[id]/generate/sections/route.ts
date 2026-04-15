@@ -4,7 +4,7 @@ import { uploadSection, downloadSection, uploadFinalPng } from '@/lib/supabase'
 import { generateSectionImage } from '@/lib/gemini'
 import { isProductSection } from '@/lib/image-utils'
 import { requireAuth, unauthorizedResponse, requireProjectOwner, forbiddenResponse } from '@/lib/auth'
-import { checkAndChargeRegen } from '@/lib/credits'
+import { chargeRegen } from '@/lib/credits'
 import { PageDesign } from '@/lib/types'
 import { sse, sseResponse } from '@/lib/sse'
 
@@ -34,11 +34,10 @@ export async function POST(
   const body = await req.json() as { sections: SectionRequest[] }
   const sectionRequests: SectionRequest[] = body.sections ?? []
 
-  // 재생성 티켓 확인 및 차감 (스트림 시작 전)
-  let regenSource: 'free' | 'purchased'
+  // 재생성 티켓 섹션 수만큼 원자적 차감 (스트림 시작 전)
+  let regenCharge: { freeUsed: number; purchasedUsed: number }
   try {
-    const result = await checkAndChargeRegen(user.id, id)
-    regenSource = result.source
+    regenCharge = await chargeRegen(user.id, id, sectionRequests.length)
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 402 })
   }
@@ -98,7 +97,12 @@ export async function POST(
         const { saveProjectData } = await import('@/lib/projects')
         await saveProjectData(id, 'html_page', html)
 
-        sse(controller, { type: 'done', message: '재생성 완료!' })
+        sse(controller, {
+          type: 'done',
+          message: '재생성 완료!',
+          freeUsed: regenCharge.freeUsed,
+          purchasedUsed: regenCharge.purchasedUsed,
+        })
       } catch (err) {
         sse(controller, { type: 'error', message: String(err) })
       } finally {

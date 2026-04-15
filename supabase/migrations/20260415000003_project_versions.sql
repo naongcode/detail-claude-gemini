@@ -1,4 +1,7 @@
--- project_versions: 렌더링 완료 시 버전 스냅샷 저장
+-- 20260415000003_project_versions.sql
+-- project_versions 테이블 생성 + RLS 정책
+-- (20260414000012의 CREATE POLICY IF NOT EXISTS 문법 오류 수정본)
+
 CREATE TABLE IF NOT EXISTS public.project_versions (
   id              BIGSERIAL PRIMARY KEY,
   project_id      TEXT NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
@@ -11,10 +14,10 @@ CREATE TABLE IF NOT EXISTS public.project_versions (
 CREATE UNIQUE INDEX IF NOT EXISTS project_versions_project_version_idx
   ON public.project_versions (project_id, version);
 
--- RLS: 프로젝트 소유자만 조회/삽입
 ALTER TABLE public.project_versions ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "project_versions_owner_select"
+DROP POLICY IF EXISTS "project_versions_owner_select" ON public.project_versions;
+CREATE POLICY "project_versions_owner_select"
   ON public.project_versions FOR SELECT
   USING (
     project_id IN (
@@ -22,6 +25,7 @@ CREATE POLICY IF NOT EXISTS "project_versions_owner_select"
     )
   );
 
-CREATE POLICY IF NOT EXISTS "project_versions_service_all"
+DROP POLICY IF EXISTS "project_versions_service_all" ON public.project_versions;
+CREATE POLICY "project_versions_service_all"
   ON public.project_versions FOR ALL
   USING (auth.role() = 'service_role');

@@ -84,6 +84,12 @@ export default function ResultTab({ projectId, projectName, projectStatus, onSta
               setImgTimestamp(Date.now())
               onStatusChange()
               setSelected({})
+              const parts: string[] = []
+              if (data.freeUsed > 0) parts.push(`무료권 ${data.freeUsed}장`)
+              if (data.purchasedUsed > 0) parts.push(`구매권 ${data.purchasedUsed}장`)
+              if (parts.length > 0) {
+                setLogs((prev) => [...prev, { message: `티켓 사용: ${parts.join(' + ')}`, isError: false }])
+              }
             }
           } catch { /* ignore */ }
         }
