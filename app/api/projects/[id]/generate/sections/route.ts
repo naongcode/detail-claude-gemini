@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { loadProjectData, getPhotoBuffers } from '@/lib/projects'
-import { uploadSection, downloadSection, uploadFinalPng, getPublicUrl } from '@/lib/supabase'
+import { uploadSection, downloadSection, uploadFinalPng } from '@/lib/supabase'
 import { generateSectionImage } from '@/lib/gemini'
 import { isProductSection } from '@/lib/image-utils'
 import { requireAuth, unauthorizedResponse, requireProjectOwner, forbiddenResponse } from '@/lib/auth'
@@ -88,10 +88,11 @@ export async function POST(
         const finalBuffer = await renderToPng(pageDesign.html, sectionBuffers)
         await uploadFinalPng(id, finalBuffer)
 
-        // html_page 업데이트
+        // html_page 업데이트 — CDN URL 대신 인증된 프록시 URL 사용 (private 버킷 대응)
+        const base = process.env.NEXT_PUBLIC_BASE_URL!
         let html = pageDesign.html
         for (const imgReq of pageDesign.images) {
-          const url = getPublicUrl(id, 'section', `${imgReq.id}.png`)
+          const url = `${base}/api/projects/${id}/files/sections/${imgReq.id}.png`
           html = html.replaceAll(`__GEN_${imgReq.id}__`, url)
         }
         const { saveProjectData } = await import('@/lib/projects')

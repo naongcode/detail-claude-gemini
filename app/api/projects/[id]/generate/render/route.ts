@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { loadProjectData } from '@/lib/projects'
-import { uploadFinalPng, downloadSection, saveProjectData, getPublicUrl, saveProjectVersion, savePipelineStatus, storagePath } from '@/lib/supabase'
+import { uploadFinalPng, downloadSection, saveProjectData, saveProjectVersion, savePipelineStatus, storagePath } from '@/lib/supabase'
 import { PageDesign } from '@/lib/types'
 import { requireAuth, unauthorizedResponse, requireProjectOwner, forbiddenResponse } from '@/lib/auth'
 
@@ -34,9 +34,11 @@ export async function POST(
     await uploadFinalPng(id, finalBuffer)
 
     // html_page 저장 (텍스트 편집용)
+    // CDN URL 대신 인증된 프록시 URL 사용 (private 버킷 대응)
+    const base = process.env.NEXT_PUBLIC_BASE_URL!
     let html = pageDesign.html
     for (const imgReq of pageDesign.images) {
-      const url = getPublicUrl(id, 'section', `${imgReq.id}.png`)
+      const url = `${base}/api/projects/${id}/files/sections/${imgReq.id}.png`
       html = html.replaceAll(`__GEN_${imgReq.id}__`, url)
     }
     await saveProjectData(id, 'html_page', html)
