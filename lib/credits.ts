@@ -45,58 +45,6 @@ export async function hasProjectCredit(userId: string, projectId: string): Promi
 }
 
 /**
- * 재생성 전 티켓 확인 및 차감.
- * 우선순위: 프로젝트 무료권 → 유저 구매권 → 없으면 throw
- * 반환값: 'free' | 'purchased'
- */
-export async function checkAndChargeRegen(
-  userId: string,
-  projectId: string,
-): Promise<{ source: 'free' | 'purchased' }> {
-  const supabase = getServiceClient()
-
-  // 프로젝트 무료권 확인
-  const { data: proj, error: projErr } = await supabase
-    .from('projects')
-    .select('regen_count, regen_limit')
-    .eq('id', projectId)
-    .single()
-
-  if (projErr || !proj) throw new Error('프로젝트를 찾을 수 없습니다.')
-
-  const { regen_count, regen_limit } = proj
-
-  // 1순위: 프로젝트 무료권 남아 있으면 사용
-  if (regen_count < regen_limit) {
-    await supabase
-      .from('projects')
-      .update({ regen_count: regen_count + 1 })
-      .eq('id', projectId)
-    return { source: 'free' }
-  }
-
-  // 2순위: 유저 구매권 확인
-  const { data: credits, error: credErr } = await supabase
-    .from('user_credits')
-    .select('regen_tickets')
-    .eq('user_id', userId)
-    .single()
-
-  if (credErr || !credits) throw new Error('크레딧 정보를 불러올 수 없습니다.')
-
-  if (credits.regen_tickets > 0) {
-    await supabase
-      .from('user_credits')
-      .update({ regen_tickets: credits.regen_tickets - 1 })
-      .eq('user_id', userId)
-    return { source: 'purchased' }
-  }
-
-  // 둘 다 없음
-  throw new Error(`프로젝트 무료 재생성권 ${regen_limit}장을 모두 사용했습니다. 재생성권을 구매해 주세요.`)
-}
-
-/**
  * 재생성 티켓 N장 원자적 차감 (race condition 방지).
  * 무료권 우선 소모 → 부족분은 구매권.
  * 티켓 부족 시 throw.
