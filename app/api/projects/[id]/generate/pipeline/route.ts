@@ -5,7 +5,7 @@ import { generateResearch } from '@/lib/openai-pipeline'
 import { generateDetailPage } from '@/lib/claude'
 import { ProductBrief, ResearchOutput, PageDesign } from '@/lib/types'
 import { sse, sseResponse } from '@/lib/sse'
-import { requireAuth, unauthorizedResponse } from '@/lib/auth'
+import { requireAuth, requireProjectOwner, unauthorizedResponse, forbiddenResponse } from '@/lib/auth'
 import { hasProjectCredit, getBalance } from '@/lib/credits'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { savePipelineStatus } from '@/lib/supabase'
@@ -35,6 +35,13 @@ export async function GET(
 
   const { id: _id } = await params
   const id = decodeURIComponent(_id)
+
+  // 소유권 검증
+  try {
+    await requireProjectOwner(user.id, id)
+  } catch {
+    return forbiddenResponse()
+  }
 
   // rate limit 확인
   try {

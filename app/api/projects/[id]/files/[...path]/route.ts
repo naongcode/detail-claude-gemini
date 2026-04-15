@@ -1,12 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPublicUrl } from '@/lib/supabase'
+import { requireAuth, requireProjectOwner, unauthorizedResponse, forbiddenResponse } from '@/lib/auth'
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string; path: string[] }> }
 ) {
+  let user
+  try {
+    user = await requireAuth()
+  } catch {
+    return unauthorizedResponse()
+  }
+
   const { id: _id, path: filePath } = await params
   const id = decodeURIComponent(_id)
+
+  try {
+    await requireProjectOwner(user.id, id)
+  } catch {
+    return forbiddenResponse()
+  }
   try {
     const joined = filePath.join('/')
 
