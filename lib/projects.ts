@@ -45,11 +45,12 @@ export async function deleteProject(pid: string): Promise<void> {
 // ── 프로젝트 상태 ─────────────────────────────────────────────────────────────
 
 export async function getProjectStatus(pid: string): Promise<ProjectStatus> {
-  const [row, photoNames, sectionNames, finalExists] = await Promise.all([
+  const [row, photoNames, sectionNames, finalExists, regenInfo] = await Promise.all([
     sb.loadProjectData<PageDesign>(pid, 'page_design'),
     sb.listPhotos(pid),
     sb.listSections(pid),
     sb.hasFinalPng(pid),
+    sb.getProjectRegenInfo(pid),
   ])
 
   let imageTotal = 0
@@ -68,12 +69,14 @@ export async function getProjectStatus(pid: string): Promise<ProjectStatus> {
     imageGenerated,
     photoCount:    photoNames.length,
     hasFinalPng:   finalExists,
+    regenCount:    regenInfo.regenCount,
+    regenLimit:    regenInfo.regenLimit,
   }
 }
 
 // ── 데이터 읽기/쓰기 (DB JSON 컬럼) ──────────────────────────────────────────
 
-export { loadProjectData, saveProjectData, getProjectRow } from './supabase'
+export { loadProjectData, saveProjectData, getProjectRow, getProjectRegenInfo } from './supabase'
 
 // ── 사진 ─────────────────────────────────────────────────────────────────────
 

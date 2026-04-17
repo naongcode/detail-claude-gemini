@@ -48,6 +48,7 @@ export default function AdminPage() {
         <div className="flex flex-wrap gap-3">
           <a href="/admin/costs" className="text-sm text-blue-600 hover:underline">API 비용 상세 →</a>
           <a href="/admin/users" className="text-sm text-blue-600 hover:underline">사용자 관리 →</a>
+          <a href="/admin/payments" className="text-sm text-blue-600 hover:underline">결제 · 크레딧 로그 →</a>
         </div>
       </div>
     </div>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import type { TextBlock } from '@/app/api/projects/[id]/html-text/route'
-import { PageDesign, ImageRequest } from '@/lib/types'
+import { PageDesign } from '@/lib/types'
 import SectionImage from '@/components/ui/SectionImage'
 
 interface Props {
@@ -45,7 +45,6 @@ function sectionLabel(key: string): string {
 }
 
 type TextSaveState = 'idle' | 'saving' | 'done' | 'error'
-interface LogEntry { message: string; isError: boolean }
 
 export default function TextEditTab({ projectId, onStatusChange }: Props) {
   const [pageDesign, setPageDesign] = useState<PageDesign | null>(null)
@@ -55,12 +54,6 @@ export default function TextEditTab({ projectId, onStatusChange }: Props) {
   const [loading, setLoading] = useState(true)
   const [imgTimestamp, setImgTimestamp] = useState(Date.now())
 
-  // Image regeneration state
-  const [regenNote, setRegenNote] = useState<Record<string, string>>({})
-  const [regenerating, setRegenerating] = useState<string | null>(null) // sectionId being regenerated
-  const [logs, setLogs] = useState<Record<string, LogEntry[]>>({})
-
-  // Text save state
   const [textSaveState, setTextSaveState] = useState<TextSaveState>('idle')
   const [changedCount, setChangedCount] = useState(0)
   const originalRef = useRef<Record<string, string>>({})
@@ -92,33 +85,6 @@ export default function TextEditTab({ projectId, onStatusChange }: Props) {
       sectionOrder.push(b.section)
     }
     blocksBySection[b.section].push(b)
-  }
-
-  // Image requests keyed by id for quick lookup
-  const imageById: Record<string, ImageRequest> = {}
-  for (const img of pageDesign?.images ?? []) {
-    imageById[img.id] = img
-  }
-
-  // Image requests keyed by id for quick lookup
-  // Priority: sectionImages map (extracted from actual HTML img src) → fuzzy fallback
-  function findImage(key: string): ImageRequest | null {
-    // Direct hit from sectionImages (most accurate — extracted from page.html)
-    const directId = sectionImages[key]
-    if (directId && imageById[directId]) return imageById[directId]
-    // Fallback fuzzy match for id-based HTML
-    if (imageById[key]) return imageById[key]
-    for (const [id, img] of Object.entries(imageById)) {
-      if (id.startsWith(key) || key.startsWith(id)) return img
-    }
-    const stripped = key.replace(/^(section_|sec_|s_)/, '')
-    if (stripped !== key) {
-      if (imageById[stripped]) return imageById[stripped]
-      for (const [id, img] of Object.entries(imageById)) {
-        if (id.startsWith(stripped) || stripped.startsWith(id)) return img
-      }
-    }
-    return null
   }
 
   const handleTextChange = (eid: string, value: string) => {
@@ -155,64 +121,6 @@ export default function TextEditTab({ projectId, onStatusChange }: Props) {
     }
   }
 
-  const handleRegen = async (imgReq: ImageRequest) => {
-    if (regenerating) return
-    setRegenerating(imgReq.id)
-    setLogs(prev => ({ ...prev, [imgReq.id]: [] }))
-    try {
-      const res = await fetch(`/api/projects/${projectId}/generate/sections`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sections: [{ key: imgReq.id, note: regenNote[imgReq.id] || '' }],
-        }),
-      })
-      if (!res.body) throw new Error('스트림 없음')
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
-      let buf = ''
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buf += decoder.decode(value, { stream: true })
-        const lines = buf.split('\n')
-        buf = lines.pop() ?? ''
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue
-          try {
-            const data = JSON.parse(line.slice(6))
-            if (data.message) {
-              setLogs(prev => ({
-                ...prev,
-                [imgReq.id]: [...(prev[imgReq.id] ?? []), { message: data.message, isError: !!data.error }],
-              }))
-            }
-            if (data.type === 'done') {
-              setImgTimestamp(Date.now())
-              onStatusChange()
-              const parts: string[] = []
-              if (data.freeUsed > 0) parts.push(`무료권 ${data.freeUsed}장`)
-              if (data.purchasedUsed > 0) parts.push(`구매권 ${data.purchasedUsed}장`)
-              if (parts.length > 0) {
-                setLogs(prev => ({
-                  ...prev,
-                  [imgReq.id]: [...(prev[imgReq.id] ?? []), { message: `티켓 사용: ${parts.join(' + ')}`, isError: false }],
-                }))
-              }
-            }
-          } catch { /* ignore */ }
-        }
-      }
-    } catch (err) {
-      setLogs(prev => ({
-        ...prev,
-        [imgReq.id]: [...(prev[imgReq.id] ?? []), { message: String(err), isError: true }],
-      }))
-    } finally {
-      setRegenerating(null)
-    }
-  }
-
   const fileUrl = (path: string) => `/api/projects/${projectId}/files/${path}?t=${imgTimestamp}`
 
   if (loading) return (
@@ -237,7 +145,7 @@ export default function TextEditTab({ projectId, onStatusChange }: Props) {
       {/* Toolbar */}
       <div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-6 py-3 flex items-center gap-3">
         <span className="text-sm text-slate-500 flex-1">
-          섹션 이미지를 클릭해 텍스트 편집 · 재생성 메모를 입력하세요
+          텍스트를 수정하고 저장하면 최종 이미지가 다시 렌더링됩니다
         </span>
         {changedCount > 0 && (
           <span className="text-sm font-medium text-amber-600 bg-amber-50 px-3 py-1 rounded-full border border-amber-200 shrink-0">
@@ -267,11 +175,8 @@ export default function TextEditTab({ projectId, onStatusChange }: Props) {
       <div className="flex-1 overflow-y-auto p-6 space-y-6 max-w-5xl mx-auto w-full">
         {sectionOrder.map((sectionKey, idx) => {
           const sectionBlocks = blocksBySection[sectionKey]
-          const imageId = sectionImages[sectionKey]   // HTML에서 직접 추출한 이미지 ID
+          const imageId = sectionImages[sectionKey]
           const imgSrc = imageId ? fileUrl(`sections/${imageId}.png`) : null
-          const imgReq = imageId ? (imageById[imageId] ?? null) : findImage(sectionKey)
-          const isRegenerating = regenerating === (imageId ?? imgReq?.id)
-          const sectionLogs = logs[imageId ?? imgReq?.id ?? sectionKey] ?? []
           const sectionChanges = sectionBlocks.filter(
             b => (edits[b.eid] ?? b.text) !== originalRef.current[b.eid]
           ).length
@@ -292,38 +197,11 @@ export default function TextEditTab({ projectId, onStatusChange }: Props) {
                 )}
               </div>
 
-              {/* Body: 항상 2-컬럼 — 좌측 이미지, 우측 텍스트 */}
+              {/* Body: 2-컬럼 — 좌측 이미지(읽기 전용), 우측 텍스트 */}
               <div className="grid grid-cols-2 divide-x divide-slate-100">
-                {/* Left: section image + regen controls */}
-                <div className="flex flex-col">
+                {/* Left: section image (read-only) */}
+                <div>
                   <SectionImage src={imgSrc} alt={sectionKey} />
-                  {imgReq && (
-                    <div className="p-3 border-t border-slate-100 bg-slate-50">
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={regenNote[imgReq.id] || ''}
-                          onChange={e => setRegenNote(prev => ({ ...prev, [imgReq.id]: e.target.value }))}
-                          placeholder="재생성 요청 메모 (예: 배경 더 밝게)"
-                          className="flex-1 text-xs border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-blue-400 min-w-0 bg-white"
-                        />
-                        <button
-                          onClick={() => imgReq && handleRegen(imgReq)}
-                          disabled={!!regenerating || !imgReq}
-                          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold shrink-0 bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-40 transition-colors"
-                        >
-                          {isRegenerating
-                            ? <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />생성 중</>
-                            : '🔄 재생성'}
-                        </button>
-                      </div>
-                      {sectionLogs.length > 0 && (
-                        <p className="mt-1.5 text-xs font-mono text-slate-400 truncate">
-                          {sectionLogs[sectionLogs.length - 1].message}
-                        </p>
-                      )}
-                    </div>
-                  )}
                 </div>
 
                 {/* Right: text fields */}
@@ -396,4 +274,3 @@ function TextRow({ block, value, original, onChange, onReset }: TextRowProps) {
     </div>
   )
 }
-

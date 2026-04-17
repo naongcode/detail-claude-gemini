@@ -136,4 +136,6 @@ export interface ProjectStatus {
   imageGenerated: number   // 생성 완료된 이미지 수
   photoCount: number
   hasFinalPng: boolean
+  regenCount: number       // 사용한 무료 재생성 횟수
+  regenLimit: number       // 프로젝트 당 무료 재생성 한도 (기본 5)
 }

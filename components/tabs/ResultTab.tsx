@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { ProjectStatus, PageDesign, ImageRequest } from '@/lib/types'
 import SectionImage from '@/components/ui/SectionImage'
 
@@ -27,12 +27,38 @@ export default function ResultTab({ projectId, projectName, projectStatus, onSta
   const [regenerating, setRegenerating] = useState(false)
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [versions, setVersions] = useState<VersionItem[]>([])
+  const [purchasedTickets, setPurchasedTickets] = useState<number | null>(null)
+  const [deductToast, setDeductToast] = useState<string | null>(null)
+  const [showRegenConfirm, setShowRegenConfirm] = useState(false)
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const freeRegenLeft = projectStatus
+    ? Math.max(0, (projectStatus.regenLimit ?? 5) - (projectStatus.regenCount ?? 0))
+    : null
 
   useEffect(() => {
     fetch(`/api/projects/${projectId}/data/layout`)
       .then((r) => r.ok ? r.json() : null)
       .then((data) => setPageDesign(data))
   }, [projectId, projectStatus?.imageGenerated])
+
+  useEffect(() => {
+    fetch('/api/credits')
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => { if (d) setPurchasedTickets(d.regen_tickets) })
+  }, [])
+
+  const refreshRegenTickets = () => {
+    fetch('/api/credits')
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => { if (d) setPurchasedTickets(d.regen_tickets) })
+  }
+
+  const showDeductToast = (msg: string) => {
+    setDeductToast(msg)
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    toastTimer.current = setTimeout(() => setDeductToast(null), 4000)
+  }
 
   useEffect(() => {
     fetch(`/api/projects/${projectId}/versions`)
@@ -52,6 +78,7 @@ export default function ResultTab({ projectId, projectName, projectStatus, onSta
 
   const handleRegenerate = async () => {
     if (selectedKeys.length === 0 || regenerating) return
+    setShowRegenConfirm(false)
     setRegenerating(true)
     setLogs([])
 
@@ -84,11 +111,12 @@ export default function ResultTab({ projectId, projectName, projectStatus, onSta
               setImgTimestamp(Date.now())
               onStatusChange()
               setSelected({})
+              refreshRegenTickets()
               const parts: string[] = []
               if (data.freeUsed > 0) parts.push(`무료권 ${data.freeUsed}장`)
               if (data.purchasedUsed > 0) parts.push(`구매권 ${data.purchasedUsed}장`)
               if (parts.length > 0) {
-                setLogs((prev) => [...prev, { message: `티켓 사용: ${parts.join(' + ')}`, isError: false }])
+                showDeductToast(`재생성권 차감: ${parts.join(' + ')}`)
               }
             }
           } catch { /* ignore */ }
@@ -117,6 +145,41 @@ export default function ResultTab({ projectId, projectName, projectStatus, onSta
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
+      {/* 재생성 확인 모달 */}
+      {showRegenConfirm && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+            <h2 className="text-base font-bold text-slate-900 mb-1">재생성 확인</h2>
+            <p className="text-sm text-slate-500 mb-4">
+              섹션 <span className="font-semibold text-slate-700">{selectedKeys.length}개</span>를 재생성합니다.
+            </p>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800 mb-5 space-y-1.5">
+              <p>🎟️ 재생성권 최대 <span className="font-bold">{selectedKeys.length}장</span>이 차감됩니다.</p>
+              <p className="text-amber-600 text-xs">
+                무료권 우선 사용 →
+                {freeRegenLeft !== null && <span className="font-semibold"> 무료 {freeRegenLeft}장</span>}
+                {purchasedTickets !== null && <span className="font-semibold"> · 구매권 {purchasedTickets}장</span>}
+                {' '}남음
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={handleRegenerate}
+                className="flex-1 bg-blue-600 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors"
+              >
+                재생성
+              </button>
+              <button
+                onClick={() => setShowRegenConfirm(false)}
+                className="flex-1 border border-slate-300 text-slate-700 py-2.5 rounded-xl text-sm hover:bg-slate-50 transition-colors"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
@@ -162,12 +225,26 @@ export default function ResultTab({ projectId, projectName, projectStatus, onSta
       {pageDesign && pageDesign.images.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-3">
-            <h3 className="text-sm font-semibold text-slate-700">🔄 섹션별 재생성</h3>
+            <div className="flex items-center gap-3">
+              <h3 className="text-sm font-semibold text-slate-700">🔄 섹션별 재생성</h3>
+              {freeRegenLeft !== null && (
+                <span className={`text-xs px-2.5 py-1 rounded-full font-medium border ${
+                  freeRegenLeft === 0 ? 'bg-slate-100 border-slate-200 text-slate-400' : 'bg-purple-50 border-purple-200 text-purple-700'
+                }`}>
+                  무료 {freeRegenLeft}장
+                </span>
+              )}
+              {purchasedTickets !== null && purchasedTickets > 0 && (
+                <span className="text-xs px-2.5 py-1 rounded-full font-medium border bg-blue-50 border-blue-200 text-blue-700">
+                  구매권 {purchasedTickets}장
+                </span>
+              )}
+            </div>
             {selectedKeys.length > 0 && (
               <div className="flex items-center gap-3">
                 <span className="text-sm text-blue-700 font-medium">{selectedKeys.length}개 선택</span>
                 <button
-                  onClick={handleRegenerate}
+                  onClick={() => setShowRegenConfirm(true)}
                   disabled={regenerating}
                   className="bg-blue-600 text-white text-sm px-5 py-2 rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors font-medium"
                 >
@@ -183,6 +260,15 @@ export default function ResultTab({ projectId, projectName, projectStatus, onSta
               </div>
             )}
           </div>
+
+          {/* 차감 토스트 */}
+          {deductToast && (
+            <div className="flex items-center gap-2 bg-purple-50 border border-purple-200 rounded-xl px-4 py-2.5 text-sm text-purple-800 font-medium">
+              <span>🎟️</span>
+              <span>{deductToast}</span>
+              <button onClick={() => setDeductToast(null)} className="ml-auto text-purple-400 hover:text-purple-600 text-xs">✕</button>
+            </div>
+          )}
 
           {/* Progress log */}
           {logs.length > 0 && (
@@ -301,6 +387,11 @@ function SectionCard({ img, src, checked, note, disabled, onToggle, onNoteChange
 
 function FinalImage({ src }: { src: string }) {
   const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>('loading')
+
+  useEffect(() => {
+    setStatus('loading')
+  }, [src])
+
   return (
     <div className="relative bg-slate-50">
       {status === 'loading' && (

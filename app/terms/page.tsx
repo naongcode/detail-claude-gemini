@@ -81,9 +81,8 @@ export default function TermsPage() {
           <section>
             <h2 className="text-base font-bold text-slate-800 mb-3">회사 정보</h2>
             <ul className="space-y-1">
-              <li>상호명: </li>
-              <li>사업자등록번호: </li>
-              <li>이메일: </li>
+              <li>상호명: 냥짱앱스</li>
+              <li>이메일: dev.naongcus@gmail.com</li>
             </ul>
           </section>
 

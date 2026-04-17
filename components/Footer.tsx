@@ -6,8 +6,8 @@ export default function Footer() {
       <div className="max-w-3xl mx-auto px-6 py-8">
         {/* 사업자 정보 */}
         <div className="text-xs text-slate-400 space-y-1 mb-5">
-          <p>상호명: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | 사업자등록번호: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | 통신판매업 신고번호: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</p>
-          <p>이메일: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | 고객센터: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</p>
+          <p>상호명: 냥짱앱스 | 사업자등록번호: 415-17-05399 | 통신판매업 신고번호: -</p>
+          <p>고객센터: dev.naongcus@gmail.com</p>
         </div>
 
         {/* 링크 */}

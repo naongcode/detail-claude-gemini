@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface Props {
   src: string | null
@@ -10,6 +10,11 @@ interface Props {
 
 export default function SectionImage({ src, alt, aspectRatio }: Props) {
   const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>('loading')
+
+  // src가 바뀌면 상태를 리셋해서 새 이미지를 강제 재로드
+  useEffect(() => {
+    setStatus('loading')
+  }, [src])
 
   if (!src) {
     return (

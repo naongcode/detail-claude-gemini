@@ -87,6 +87,19 @@ export async function getProjectRow(pid: string): Promise<{
   }
 }
 
+export async function getProjectRegenInfo(pid: string): Promise<{ regenCount: number; regenLimit: number }> {
+  const supabase = getClient()
+  const { data } = await supabase
+    .from('projects')
+    .select('regen_count, regen_limit')
+    .eq('id', pid)
+    .single()
+  return {
+    regenCount: (data as { regen_count: number } | null)?.regen_count ?? 0,
+    regenLimit: (data as { regen_limit: number } | null)?.regen_limit ?? 5,
+  }
+}
+
 export async function loadProjectData<T>(pid: string, field: DataField): Promise<T | null> {
   const supabase = getClient()
   const { data, error } = await supabase

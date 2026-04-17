@@ -17,6 +17,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <Link href="/admin" className="hover:text-white transition-colors">개요</Link>
           <Link href="/admin/costs" className="hover:text-white transition-colors">API 비용</Link>
           <Link href="/admin/users" className="hover:text-white transition-colors">사용자</Link>
+          <Link href="/admin/payments" className="hover:text-white transition-colors">결제 로그</Link>
         </nav>
         <Link href="/projects" className="ml-auto text-xs text-slate-400 hover:text-white transition-colors">
           ← 서비스로 돌아가기
