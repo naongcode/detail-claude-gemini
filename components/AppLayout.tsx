@@ -21,7 +21,7 @@ type TabId = 'brief' | 'layout' | 'text' | 'result'
 const TABS: { id: TabId; label: string; icon: string }[] = [
   { id: 'brief',  label: '제품 정보',  icon: '📝' },
   { id: 'result', label: '결과 확인',  icon: '📄' },
-  { id: 'text',   label: '섹션 편집',  icon: '✏️' },
+  { id: 'text',   label: '텍스트 편집', icon: '✏️' },
   { id: 'layout', label: 'HTML 편집',  icon: '🗂️' },
 ]
 
@@ -174,7 +174,7 @@ export default function AppLayout({ projectId }: Props) {
           </div>
         </div>
 
-        {/* 인증 유도 배너 */}
+        {/* 인증 유도 배너 - 준비중
         {!phoneVerified && (
           <div className="bg-amber-50 border-b border-amber-200 px-6 py-2.5 flex items-center justify-between gap-4 shrink-0">
             <p className="text-sm text-amber-800">
@@ -188,6 +188,7 @@ export default function AppLayout({ projectId }: Props) {
             </a>
           </div>
         )}
+        */}
 
         {/* Tabs */}
         <div className="bg-white border-b border-slate-200 px-6 shrink-0">

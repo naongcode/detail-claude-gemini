@@ -133,7 +133,7 @@ export default function ProjectsPage() {
         </div>
       </div>
 
-      {/* 인증 유도 배너 */}
+      {/* 인증 유도 배너 - 준비중
       {!phoneVerified && (
         <div className="bg-amber-50 border-b border-amber-200 px-6 py-2.5 flex items-center justify-between gap-4">
           <p className="text-sm text-amber-800">
@@ -147,6 +147,7 @@ export default function ProjectsPage() {
           </a>
         </div>
       )}
+      */}
 
       {/* 카카오 인증 결과 토스트 */}
       {verifyToast && (
