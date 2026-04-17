@@ -43,4 +43,7 @@ next-env.d.ts
 # generated project data
 /projects/
 
+# test output
+/scripts/test-output/
+
 .vercel
