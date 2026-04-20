@@ -10,6 +10,7 @@ import LayoutTab from './tabs/LayoutTab'
 import TextEditTab from './tabs/TextEditTab'
 import ResultTab from './tabs/ResultTab'
 import CreditModal from './ui/CreditModal'
+import StatusPanel from './StatusPanel'
 import { ProjectMeta, ProjectStatus } from '@/lib/types'
 
 interface Props {
@@ -173,6 +174,9 @@ export default function AppLayout({ projectId }: Props) {
             </button>
           </div>
         </div>
+
+        {/* 상황판 */}
+        <StatusPanel status={projectStatus} onTabChange={(tab) => setActiveTab(tab as TabId)} />
 
         {/* 인증 유도 배너 - 준비중
         {!phoneVerified && (

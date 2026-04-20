@@ -8,7 +8,7 @@ import { sse, sseResponse } from '@/lib/sse'
 import { requireAuth, requireProjectOwner, unauthorizedResponse, forbiddenResponse } from '@/lib/auth'
 import { hasProjectCredit, getBalance } from '@/lib/credits'
 import { checkRateLimit } from '@/lib/rate-limit'
-import { savePipelineStatus } from '@/lib/supabase'
+import { savePipelineStatus, hasFinalPng } from '@/lib/supabase'
 import { notify } from '@/lib/notify'
 
 function getServiceClient() {
@@ -48,6 +48,12 @@ export async function GET(
     await checkRateLimit(user.id)
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 429 })
+  }
+
+  // 이미 완성된 프로젝트는 재실행 차단
+  const alreadyDone = await hasFinalPng(id)
+  if (alreadyDone) {
+    return NextResponse.json({ error: '이미 생성이 완료된 프로젝트입니다. 이미지 수정은 섹션 재생성을 이용해주세요.' }, { status: 409 })
   }
 
   // 크레딧 확인

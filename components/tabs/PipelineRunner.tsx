@@ -205,14 +205,16 @@ export default function PipelineRunner({ projectId, projectStatus, onStatusChang
             <button onClick={handleStop} className="bg-red-500 text-white text-sm px-5 py-2.5 rounded-xl hover:bg-red-600 transition-colors font-semibold">
               ■ 중지
             </button>
-          ) : (
+          ) : !projectStatus?.hasFinalPng ? (
             <button
               onClick={handleRun}
               disabled={!projectStatus?.hasBrief}
               className="bg-green-600 text-white text-sm px-5 py-2.5 rounded-xl hover:bg-green-700 disabled:opacity-40 transition-colors font-semibold"
             >
-              {projectStatus?.hasFinalPng ? '▶ 재실행' : '▶ 실행'}
+              ▶ 실행
             </button>
+          ) : (
+            <span className="text-xs text-green-600 font-semibold bg-green-50 border border-green-200 px-4 py-2.5 rounded-xl">✓ 생성 완료</span>
           )}
         </div>
       </div>
@@ -224,7 +226,7 @@ export default function PipelineRunner({ projectId, projectStatus, onStatusChang
       )}
 
       {/* 실패 복구 UI */}
-      {lastError && !running && (
+      {lastError && !running && !projectStatus?.hasFinalPng && (
         <div className="mt-4 bg-red-50 border border-red-200 rounded-xl p-4">
           <p className="text-sm font-medium text-red-700">{lastError.stage}에서 오류 발생</p>
           <p className="text-xs text-red-500 mt-1 line-clamp-2">{lastError.message}</p>
